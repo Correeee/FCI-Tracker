@@ -87,7 +87,6 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     const tbody = document.getElementById('cuerpoTablaFull');
     if (!tbody) return;
 
-    // --- LÓGICA DE SEGMENTACIÓN PARA PAGINACIÓN ---
     const inicio = (paginaActual - 1) * registrosPorPagina;
     const fin = inicio + registrosPorPagina;
     const historialSegmentado = [...historialFiltrado].reverse().slice(inicio, fin);
@@ -149,13 +148,10 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     renderizarControlesPaginacion();
 }
 
-// --- NUEVA FUNCIÓN PARA BOTONES DE NAVEGACIÓN ---
 function renderizarControlesPaginacion() {
     const contenedor = document.getElementById('controlesPaginacion');
     if (!contenedor) return;
-
     const totalPaginas = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
-    
     contenedor.innerHTML = `
         <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; padding-bottom: 20px;">
             <button id="btnPrev" ${paginaActual === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; background: white;">Anterior</button>
@@ -163,14 +159,12 @@ function renderizarControlesPaginacion() {
             <button id="btnNext" ${paginaActual >= totalPaginas ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; background: white;">Siguiente</button>
         </div>
     `;
-
     document.getElementById('btnPrev').onclick = () => {
         if (paginaActual > 1) {
             paginaActual--;
             renderizarDashboard(historialFiltradoActual);
         }
     };
-
     document.getElementById('btnNext').onclick = () => {
         const totalPaginas = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
         if (paginaActual < totalPaginas) {
@@ -183,7 +177,6 @@ function renderizarControlesPaginacion() {
 // 5. INICIALIZACIÓN
 async function inicializarDashboard() {
     await obtenerDolar();
-    
     chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas'], async (res) => {
         const cuotasActuales = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
         if (!res.historial || res.historial.length === 0) return;
@@ -213,10 +206,8 @@ async function inicializarDashboard() {
                 const ultimos7 = registrosValidos.slice(-7);
                 const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
-                
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
-                
                 const vcpInicial = registroBase.vcp;
                 const dineroInicial7d = registroBase.dinero;
 
@@ -232,7 +223,15 @@ async function inicializarDashboard() {
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
             const mensualTNA = diariaDecimal * 30 * 100; 
-            const mensualTEA = (Math.pow(1 + diariaDecimal, 30) - 1) * 100; 
+            const mensualTEA = (Math.pow(1 + diariaDecimal, 30) - 1) * 100;
+
+            const saldoARSActual = ultimoRegistro.dinero;
+            const saldoUSDActual = saldoARSActual / cotizacionDolar;
+            const proyARS_Nominal = saldoARSActual * (1 + (mensualTNA / 100));
+            const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEA / 100));
+
+            const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
+            const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 
             vcpDisplay.innerHTML = `
                 <div style="font-size: 16px;">Valor Cuotaparte: <strong>$${vcpARS}</strong> | <strong>u$s ${vcpUSD}</strong></div>
@@ -246,19 +245,36 @@ async function inicializarDashboard() {
                         Nominal: <strong style="color: #2980b9;">${mensualTNA.toFixed(2)}%</strong> | 
                         Efectivo: <strong style="color: #27ae60;">${mensualTEA.toFixed(2)}%</strong>
                     </div>
-                    <div style="margin-top: 8px; padding: 5px 12px; background: #f8f9fa; border-radius: 6px; display: flex; border: 1px solid #e9ecef;">
-                        Últimos 7 días: 
-                        <strong style="color: ${variacionAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'};">
-                            ${variacionAcumulada7d >= 0 ? '▲' : '▼'} ${variacionAcumulada7d.toFixed(2)}%
-                        </strong>
-                        <span style="margin: 0 8px; color: #ccc;">|</span>
-                        Ganancia acumulada: 
-                        <strong style="color: ${gananciaAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'};">
-                            +$${gananciaAcumulada7d.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </strong>
-                        <span style="color: #636e72; font-size: 11px; margin-left: 4px;">
-                            (u$s ${gananciaAcumulada7dUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                        </span>
+                    <div style="margin-top: 8px; padding: 5px 12px; background: #f8f9fa; border-radius: 6px; display: block; border: 1px solid #e9ecef;">
+                        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                            Últimos 7 días: 
+                            <strong style="color: ${variacionAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
+                                ${variacionAcumulada7d >= 0 ? '▲' : '▼'} ${variacionAcumulada7d.toFixed(2)}%
+                            </strong>
+                            <span style="margin: 0 8px; color: #ccc;">|</span>
+                            Ganancia acumulada: 
+                            <strong style="color: ${gananciaAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
+                                +$${gananciaAcumulada7d.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                            <span style="color: #636e72; font-size: 11px; margin-left: 4px;">
+                                (u$s ${gananciaAcumulada7dUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                            </span>
+                        </div>
+                        <div style="border-top: 1px dashed #ddd; margin-top: 4px; padding-top: 4px; font-size: 13px;">
+                            <strong>DINERO TOTAL ACTUAL:</strong> 
+                            <span style="color: #2d3436;">$${saldoARSActual.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
+                            <span style="color: #27ae60;">u$s ${saldoUSDActual.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px; font-size: 12px;">
+                            <strong>Proyección Saldo (30d):</strong> 
+                            Nominal: <span style="color: #2980b9; font-weight: bold;">$${proyARS_Nominal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
+                            Efectiva: <span style="color: #27ae60; font-weight: bold;">$${proyARS_Efectiva.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div style="font-size: 11px; margin-top: 2px; color: #7f8c8d; opacity: 0.9;">
+                            <strong>Ganancia proyectada (30d):</strong> 
+                            Nominal: <span style="color: #2980b9;">+$${gananciaProyNominal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
+                            Efectiva: <span style="color: #27ae60;">+$${gananciaProyEfectiva.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
                     </div>
                 </div>
             `;
