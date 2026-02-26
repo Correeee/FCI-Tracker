@@ -10,7 +10,6 @@ let CUOTAPARTES_TOTALES = 50.188484;
 async function obtenerDolarOficial() {
     console.log("🔍 [1] Llamando API Dólar...");
     try {
-        // CAMBIO: Usamos la misma API que el dashboard
         const response = await fetch('https://dolarapi.com/v1/dolares/oficial');
         const data = await response.json();
         console.log("💵 [1] Dólar obtenido:", data.venta);
@@ -21,9 +20,12 @@ async function obtenerDolarOficial() {
     }
 }
 
-// Función para ocultar montos si el ojo está tachado
+// Función para formatear montos con máximo 2 decimales
 function f(monto, ocultar = false) {
-    return ocultar ? "******" : monto.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+    return ocultar ? "******" : monto.toLocaleString('es-AR', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    });
 }
 
 async function renderizarDesdeStorage() {
@@ -32,7 +34,6 @@ async function renderizarDesdeStorage() {
     
     if (res.cuotas) {
         CUOTAPARTES_TOTALES = parseFloat(res.cuotas);
-        console.log("🔢 [2] Cuotas detectadas:", CUOTAPARTES_TOTALES);
     }
     saldoOculto = res.saldoOculto || false;
     
@@ -46,9 +47,7 @@ async function renderizarDesdeStorage() {
         const saldoActual = CUOTAPARTES_TOTALES * vcpActual;
         const gananciaTotalPesos = saldoActual - INVERSION_INICIAL_PESOS;
         
-        console.log("📈 [2] Datos Historial -> Fecha:", ultimo.fecha, "| VCP:", vcpActual);
-        console.log("💰 [2] Cálculo Saldo:", CUOTAPARTES_TOTALES, "*", vcpActual, "=", saldoActual);
-
+        // Sincronizar inputs con 2 decimales
         document.getElementById('miInversion').value = saldoActual.toFixed(2);
         document.getElementById('valVCP').textContent = vcpActual.toFixed(2);
         document.getElementById('fechaVCP').textContent = ultimo.fecha.split('-').reverse().join('/');
@@ -72,7 +71,7 @@ async function renderizarDesdeStorage() {
             </div>
             <div style="margin-bottom: 10px; font-size: 11px; color: #636e72; line-height: 1.4; border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px;">
                 <div>Capital Inicial: <strong>$${f(INVERSION_INICIAL_PESOS, saldoOculto)}</strong></div>
-                <div>Cuotas: <strong>${CUOTAPARTES_TOTALES.toFixed(6)}</strong></div>
+                <div>Cuotas: <strong>${CUOTAPARTES_TOTALES.toFixed(2)}</strong></div>
                 <div>Ganancia Total: 
                     <span style="color:${posTotal ? '#27ae60' : '#d63031'}; font-weight:bold">
                         +$${f(gananciaTotalPesos, saldoOculto)} 
@@ -96,7 +95,7 @@ async function renderizarDesdeStorage() {
         if (usdContent) {
             usdContent.style.display = 'block';
             document.getElementById('valUSD').textContent = `u$s ${f((saldoActual / precioDolar), saldoOculto)}`;
-            document.getElementById('cotizacionMEP').textContent = `Dólar Oficial: $${precioDolar}`;
+            document.getElementById('cotizacionMEP').textContent = `Dólar Oficial: $${precioDolar.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`;
         }
     } else {
         console.warn("ℹ️ [2] El historial está vacío.");
@@ -133,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
         miInversion.readOnly = bloqueado;
         nombreUsuarioInput.readOnly = bloqueado;
         btnGuardar.textContent = bloqueado ? "Editar" : "Guardar";
-        console.log("💾 [4] Guardando Cambios -> Bloqueado:", bloqueado);
         chrome.storage.sync.set({ 
             monto: miInversion.value, 
             usuario: nombreUsuarioInput.value,
@@ -166,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 variacion: 0,
                 nota: operacion === 'sumar' ? "Suscripción (+)" : "Rescate (-)"
             });
-            console.log("➕ [5] Movimiento registrado. Nuevas cuotas:", CUOTAPARTES_TOTALES);
             chrome.storage.sync.set({ cuotas: CUOTAPARTES_TOTALES, historial: historial }, () => {
                 document.getElementById('inputNuevoAporte').value = "";
                 document.getElementById('sectionAporte').style.display = 'none';
@@ -204,32 +201,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function cargarFondos(tipo, preseleccionado = null) {
-    console.log("📡 [6] Cargando listado de fondos para buscador...");
     try {
         const url = `https://api.argentinadatos.com/v1/finanzas/fci/rentaFija/ultimo?t=${Date.now()}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error("Error en API FCI: " + response.status);
         fondosData = await response.json();
         
-        console.log("✅ [6] Fondos cargados. Buscando actualización para tu fondo...");
-
         const miFondoApi = fondosData.find(f => 
             f.fondo.toUpperCase().includes("SBS") && 
             f.fondo.toUpperCase().includes("RENTA FIJA")
         );
 
         if (miFondoApi) {
-            console.log("📈 [6] VCP en API:", miFondoApi.vcp, "Fecha:", miFondoApi.fecha);
-            
-            // LÓGICA DE AUTO-GUARDADO
             chrome.storage.sync.get(['historial'], (res) => {
                 let historial = res.historial || [];
                 const ultimoRegistro = historial[historial.length - 1];
 
-                // Si la fecha de la API es más nueva que la última guardada, actualizamos
                 if (!ultimoRegistro || ultimoRegistro.fecha !== miFondoApi.fecha) {
-                    console.log("💾 [6] ¡Nueva fecha detectada! Guardando en historial...");
-                    
                     let variacion = 0;
                     if (ultimoRegistro) {
                         variacion = ((miFondoApi.vcp - ultimoRegistro.vcp) / ultimoRegistro.vcp) * 100;
@@ -244,7 +232,6 @@ async function cargarFondos(tipo, preseleccionado = null) {
                     });
 
                     chrome.storage.sync.set({ historial: historial }, () => {
-                        console.log("✅ [6] Historial actualizado. Refrescando UI...");
                         renderizarDesdeStorage();
                     });
                 }
@@ -254,29 +241,55 @@ async function cargarFondos(tipo, preseleccionado = null) {
 }
 
 window.test = function() {
+
     console.log("📡 [TEST] Consultando URL de Renta Fija...");
+
     fetch('https://api.argentinadatos.com/v1/finanzas/fci/rentaFija/ultimo')
+
         .then(response => {
+
             if (!response.ok) throw new Error("Status: " + response.status);
+
             return response.json();
+
         })
+
         .then(data => {
+
             console.log("✅ [TEST] Datos recibidos (Lista General):");
+
             console.table(data.slice(0, 50));
 
-            const miFondo = data.find(f => 
-                f.fondo.toUpperCase().includes("SBS") && 
+
+
+            const miFondo = data.find(f =>
+
+                f.fondo.toUpperCase().includes("SBS") &&
+
                 f.fondo.toUpperCase().includes("RENTA FIJA")
+
             );
 
+
+
             if (miFondo) {
+
                 console.log("%c🎯 [TEST] Datos de mi FCI seleccionado:", "color:#27ae60; font-weight:bold;");
-                console.table([miFondo]); 
+
+                console.table([miFondo]);
+
             } else {
+
                 console.warn("⚠️ [TEST] No se encontró el fondo exacto.");
+
                 const parecidos = data.filter(f => f.fondo.toUpperCase().includes("SBS"));
+
                 console.table(parecidos);
+
             }
+
         })
+
         .catch(error => console.error("❌ [TEST] Falló:", error));
+
 };
