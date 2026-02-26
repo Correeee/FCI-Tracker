@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Historial de Inversiones - Dashboard</title>
+    <script src="chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background: #f4f7f6; color: #2d3436; line-height: 1.6; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.08); }
+        header { border-bottom: 2px solid #f1f2f6; margin-bottom: 20px; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #0984e3; margin: 0; font-size: 28px; }
+        .subtitle { margin: 5px 0; color: #7f8c8d; font-size: 14px; }
+        .user-badge { background: #e1f5fe; color: #0984e3; padding: 8px 15px; border-radius: 50px; font-weight: bold; font-size: 14px; }
+        .usd-info { font-size: 12px; color: #27ae60; font-weight: bold; margin-top: 10px; }
+        .vcp-header-info { font-size: 12px; color: #636e72; font-weight: 500; margin-top: 4px; }
+        
+        /* ESTILOS FILTRO */
+        .filter-bar { background: #f8f9fa; padding: 15px; border-radius: 12px; display: flex; gap: 20px; align-items: center; margin-bottom: 20px; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: 10px; text-transform: uppercase; color: #95a5a6; font-weight: bold; margin-bottom: 4px; }
+        .filter-group input { padding: 6px 10px; border: 1px solid #dfe6e9; border-radius: 6px; font-size: 13px; color: #2d3436; }
+        .btn-reset-filter { background: #dfe6e9; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #636e72; margin-top: 15px; }
+        .btn-reset-filter:hover { background: #b2bec3; color: white; }
+
+        .chart-container { margin: 20px 0 40px 0; height: 350px; position: relative; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { text-align: left; background: #f8f9fa; padding: 18px; color: #7f8c8d; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+        td { padding: 18px; border-bottom: 1px solid #f1f2f6; font-size: 15px; }
+        tr:hover { background-color: #fdfdfd; }
+        .positive { color: #27ae60; font-weight: bold; }
+        .negative { color: #d63031; font-weight: bold; }
+        .usd-cell { color: #27ae60; font-weight: 600; font-size: 12px; margin-top: 4px; }
+        .total-cell { font-weight: 700; color: #2d3436; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Inversiones de: <span id="displayUsuario">...</span></h1>
+                <p class="subtitle">Evolución bimonetaria de tus activos.</p>
+                <div id="cotizacionHoy" class="usd-info">Dólar Oficial: $1390</div>
+                <div id="vcpInfo" class="vcp-header-info">Valor Cuotaparte: $-- | u$s --</div>
+            </div>
+            <div class="user-badge" id="badgeFondo">SBS Gestion Renta Fija - Clase A</div>
+        </header>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>Desde</label>
+                <input type="date" id="fechaDesde">
+            </div>
+            <div class="filter-group">
+                <label>Hasta</label>
+                <input type="date" id="fechaHasta">
+            </div>
+            <button class="btn-reset-filter" id="resetFiltro">Limpiar Filtro</button>
+            <div style="margin-left: auto; font-size: 12px; color: #95a5a6;">
+                Mostrando <strong id="cantRegistros" style="color: #0984e3;">--</strong> registros
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="graficoEvolucion"></canvas>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha de Cierre</th>
+                    <th>Dinero Total (ARS)</th>
+                    <th>Dinero Total (USD)</th>
+                    <th>Ganancia Diaria</th>
+                    <th>Variación (%)</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoTablaFull"></tbody>
+        </table>
+    </div>
+    <div id="controlesPaginacion"></div>
+    <script src="dashboard.js"></script>
+</body>
+</html>

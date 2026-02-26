@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { width: 420px; font-family: 'Segoe UI', sans-serif; padding: 10px; background: #f4f7f6; margin: 0; overflow-x: hidden; }
+        .card { background: white; padding: 12px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); margin-bottom: 5px; }
+        label { font-size: 10px; color: #7f8c8d; font-weight: bold; text-transform: uppercase; display: block; margin-top: 8px; }
+        input, select { width: 100%; padding: 7px; margin: 4px 0; border: 1px solid #dfe6e9; border-radius: 6px; box-sizing: border-box; font-size: 12px; }
+        #listaFondos { max-height: 100px; overflow-y: auto; border: 1px solid #eee; display: none; background: white; position: absolute; width: 390px; z-index: 100; }
+        .fondo-item { padding: 8px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #f9f9f9; }
+        .fondo-item:hover { background: #e1f5fe; }
+        .selected-fondo { background: #f0f7ff; border: 1px solid #0984e3; padding: 8px; border-radius: 8px; font-size: 11px; margin: 8px 0; font-weight: bold; color: #0984e3; word-break: break-all; }
+        .result { text-align: center; padding: 10px 0 5px 0; transition: all 0.3s ease; }
+        .balance { font-size: 22px !important; font-weight: bold; color: #2d3436; }
+        .flash-success { background-color: #d4edda; border-radius: 8px; transform: scale(1.02); }
+        .flash-error { background-color: #f8d7da; border-radius: 8px; transform: scale(1.02); }
+        #usdContent { text-align: center; margin-top: 5px; padding-top: 8px; border-top: 1px dashed #dfe6e9; }
+        #valUSD { font-size: 20px; font-weight: bold; color: #27ae60; }
+        #cotizacionMEP { font-size: 9px; color: #95a5a6; margin-top: 2px; }
+        .info-extra { font-size: 10px; color: #7f8c8d; margin-top: 4px; display: flex; justify-content: center; gap: 10px; }
+        .info-extra strong { color: #2d3436; }
+        .positive { color: #27ae60; font-weight: bold; }
+        .negative { color: #d63031; font-weight: bold; }
+        .btn-group { display: flex; gap: 6px; margin-top: 8px; }
+        button { flex: 1; padding: 8px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        #btnGuardar { background: #0984e3; color: white; }
+        #btnReset { background: #e74c3c; color: white; }
+        #btnAgregarDinero { background: #27ae60; color: white; flex: 0 0 35px; font-size: 16px; }
+        input:read-only { background: #f1f2f6; }
+        #sectionAporte { display: none; background: #f1f2f6; padding: 10px; border-radius: 8px; margin-top: 8px; border: 1px solid #dfe6e9; }
+        .radio-group { display: flex; gap: 10px; justify-content: center; margin-top: 5px; }
+        .radio-group label { text-transform: none; font-size: 11px; display: flex; align-items: center; gap: 3px; cursor: pointer; color: #2d3436; }
+        .vermas__recargar{
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+        #btnVerMas:hover{
+            color: red !important;
+            transition: 0.2s !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <label>Usuario</label>
+        <input type="text" id="nombreUsuario" placeholder="Tu nombre">
+        <label>Categoría</label>
+        <select id="tipoFondo">
+            <option value="rentaFija">Renta Fija</option>
+            <option value="moneyMarket">Money Market</option>
+            <option value="rentaMixta">Renta Mixta</option>
+            <option value="rentaVariable">Renta Variable</option>
+        </select>
+        <label>Buscar Fondo</label>
+        <input type="text" id="buscador" placeholder="Ej: SBS, Balanz...">
+        <div id="listaFondos"></div>
+        <div id="fondoElegidoDisplay" class="selected-fondo" style="display:none"></div>
+
+        <label>Inversión (ARS)</label>
+        <div style="display: flex; gap: 5px; align-items: center;">
+            <input type="number" id="miInversion" placeholder="Monto">
+            <button id="btnAgregarDinero" title="Suscripción/Rescate">+</button>
+        </div>
+
+        <div id="sectionAporte">
+            <label style="margin-top: 0;">¿Cuánto dinero movés?</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="number" id="inputNuevoAporte" placeholder="$ 0.00">
+                <button id="btnConfirmarAporte" style="background: #0984e3; color: white; flex: 0 0 50px;">OK</button>
+            </div>
+            <div class="radio-group">
+                <label><input type="radio" name="tipoMov" value="sumar" checked> Suscripción (+)</label>
+                <label><input type="radio" name="tipoMov" value="restar"> Rescate (-)</label>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button id="btnGuardar">Guardar</button>
+            <button id="btnReset">Reset</button>
+        </div>
+
+        <div id="content" class="result">
+            <div style="font-size:12px; color:#999">Cargando...</div>
+        </div>
+
+        <div class="info-extra">
+            <span>VCP: <strong id="valVCP">--</strong></span>
+            <span>Cierre: <strong id="fechaVCP">--</strong></span>
+        </div>
+
+        <div id="usdContent" style="display:none">
+            <div id="valUSD"></div>
+            <div id="cotizacionMEP"></div>
+        </div>
+    </div>
+    <div class="vermas__recargar">
+    <button id="btnVerMas" style="background:none; color:#0984e3; border:none; cursor:pointer; font-size:11px; margin-top:5px; text-decoration:underline; width:100%;">Ver historial completo</button>
+    <button id="btnRecargar" title="Actualizar datos">🔄Recargar</button>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
