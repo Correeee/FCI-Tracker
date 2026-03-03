@@ -268,10 +268,8 @@ async function inicializarDashboard() {
                 const ultimos7 = registrosValidos.slice(-7);
                 const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
-                
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
-                
                 const vcpInicial = registroBase.vcp;
                 const dineroInicial7d = registroBase.dinero;
 
@@ -286,13 +284,18 @@ async function inicializarDashboard() {
             
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
-            const mensualTNA = diariaDecimal * 30 * 100; 
-            const mensualTEA = (Math.pow(1 + diariaDecimal, 30) - 1) * 100;
+            
+            // CORRECCIÓN: Los porcentajes mensuales ahora se calculan proporcionalmente a la TNA y TEA anual
+            const mensualTNAPorc = (tna / 365 * 30); 
+            const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30/365) - 1) * 100;
 
             const saldoARSActual = ultimoRegistro.dinero;
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
-            const proyARS_Nominal = saldoARSActual * (1 + (mensualTNA / 100));
-            const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEA / 100));
+            
+            // Cálculos de montos finales usando los mismos porcentajes corregidos
+            const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
+            const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
+            
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 
@@ -305,8 +308,8 @@ async function inicializarDashboard() {
                     </div>
                     <div style="font-size: 11px; margin-top: 4px; color: #636e72; background: #ebf5fb; padding: 4px 10px; border-radius: 4px; display: inline-block;">
                         Proyección mensual (30d): 
-                        Nominal: <strong style="color: #2980b9;">${mensualTNA.toFixed(2)}%</strong> | 
-                        Efectivo: <strong style="color: #27ae60;">${mensualTEA.toFixed(2)}%</strong>
+                        Nominal: <strong style="color: #2980b9;">${mensualTNAPorc.toFixed(2)}%</strong> | 
+                        Efectivo: <strong style="color: #27ae60;">${mensualTEAPorc.toFixed(2)}%</strong>
                     </div>
                     <div style="margin-top: 8px; padding: 5px 12px; background: #f8f9fa; border-radius: 6px; display: block; border: 1px solid #e9ecef;">
                         <div style="display: flex; align-items: center; margin-bottom: 4px;">
