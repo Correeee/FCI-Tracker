@@ -75,7 +75,7 @@ function crearGrafico(historial, precioDolar) {
     });
 }
 
-// 4. FUNCIÓN DE RENDERIZADO (Actualizada con lógica de paginación)
+// 4. FUNCIÓN DE RENDERIZADO (Actualizada con VCP por día)
 function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     if (reiniciarPagina) paginaActual = 1;
     historialFiltradoActual = historialFiltrado;
@@ -127,10 +127,15 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
                 <td>
                     <span class="total-cell">$${h.dinero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <div style="font-size: 10px; color: #7f8c8d; margin-top: 4px;">
-                        Acumulado: <strong class="${claseAcumulada}">$${gananciaAcumulada.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        VCP: <strong>$${h.vcp.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                     </div>
                 </td>
-                <td><div class="usd-cell">u$s ${(h.dinero / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></td>
+                <td>
+                    <div class="usd-cell">u$s ${(h.dinero / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style="font-size: 10px; color: #7f8c8d; margin-top: 4px;">
+                        Acum.: <strong class="${claseAcumulada}">$${gananciaAcumulada.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                    </div>
+                </td>
                 <td class="${claseCSS}">
                     <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; opacity: 0.7; margin-bottom: 3px;">
                         ${etiquetaTipo}
@@ -284,18 +289,13 @@ async function inicializarDashboard() {
             
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
-            
-            // CORRECCIÓN: Los porcentajes mensuales ahora se calculan proporcionalmente a la TNA y TEA anual
             const mensualTNAPorc = (tna / 365 * 30); 
             const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30/365) - 1) * 100;
 
             const saldoARSActual = ultimoRegistro.dinero;
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
-            
-            // Cálculos de montos finales usando los mismos porcentajes corregidos
             const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
             const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
-            
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 
