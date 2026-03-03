@@ -174,6 +174,63 @@ function renderizarControlesPaginacion() {
     };
 }
 
+// --- FUNCIÓN PARA EXPORTAR EXCEL CON COLORES ---
+function exportarAExcel(fondoNombre) {
+    if (!historialBase || historialBase.length === 0) return alert("No hay datos para exportar");
+
+    const hoy = new Date().toLocaleDateString('es-AR').replace(/\//g, '-');
+    const filename = `${fondoNombre} - ${hoy}.xls`;
+
+    let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="UTF-8"></head>
+        <body>
+        <table border="1">
+            <tr style="background-color: #0984e3; color: white; font-weight: bold; text-align: center;">
+                <th>Fecha</th>
+                <th>VCP</th>
+                <th>Dinero Total (ARS)</th>
+                <th>Dinero Total (USD)</th>
+                <th>Ganancia Diaria (ARS)</th>
+                <th>Ganancia Diaria (USD)</th>
+                <th>Variacion %</th>
+                <th>Nota</th>
+            </tr>`;
+
+    [...historialBase].reverse().forEach((h, idx) => {
+        const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
+        let gananciaARS = h.ganancia || 0;
+        const esMovManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate"));
+        
+        if (!esMovManual && gananciaARS === 0 && idxOriginal > 0) {
+            gananciaARS = h.dinero - historialBase[idxOriginal - 1].dinero;
+        }
+
+        const colorTexto = gananciaARS >= 0 ? "#27ae60" : "#d63031";
+        const bgColor = esMovManual ? "#f1f2f6" : "#ffffff";
+
+        html += `
+            <tr style="background-color: ${bgColor};">
+                <td style="text-align: center;">${h.fecha.split('-').reverse().join('/')}</td>
+                <td style="text-align: right;">$${h.vcp.toFixed(2)}</td>
+                <td style="text-align: right; font-weight: bold; color: #0984e3;">$${h.dinero.toFixed(2)}</td>
+                <td style="text-align: right; color: #27ae60;">u$s ${(h.dinero / cotizacionDolar).toFixed(2)}</td>
+                <td style="text-align: right; font-weight: bold; color: ${colorTexto};">$${gananciaARS.toFixed(2)}</td>
+                <td style="text-align: right; color: ${colorTexto};">u$s ${(gananciaARS / cotizacionDolar).toFixed(2)}</td>
+                <td style="text-align: center; color: ${colorTexto};">${(h.variacion || 0).toFixed(2)}%</td>
+                <td>${h.nota || ""}</td>
+            </tr>`;
+    });
+
+    html += `</table></body></html>`;
+
+    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+
 // 5. INICIALIZACIÓN
 async function inicializarDashboard() {
     await obtenerDolar();
@@ -188,6 +245,11 @@ async function inicializarDashboard() {
 
         if (res.usuario) document.getElementById('displayUsuario').textContent = res.usuario;
         if (res.fondoNombre) document.getElementById('badgeFondo').textContent = res.fondoNombre;
+
+        const btnExportar = document.getElementById('btnExportar');
+        if (btnExportar) {
+            btnExportar.onclick = () => exportarAExcel(res.fondoNombre || "FCI");
+        }
 
         const ultimoRegistro = historialBase[historialBase.length - 1];
         const vcpDisplay = document.getElementById('vcpInfo');
@@ -206,8 +268,10 @@ async function inicializarDashboard() {
                 const ultimos7 = registrosValidos.slice(-7);
                 const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
+                
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
+                
                 const vcpInicial = registroBase.vcp;
                 const dineroInicial7d = registroBase.dinero;
 
@@ -229,7 +293,6 @@ async function inicializarDashboard() {
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
             const proyARS_Nominal = saldoARSActual * (1 + (mensualTNA / 100));
             const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEA / 100));
-
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 
