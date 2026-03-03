@@ -7,7 +7,7 @@ let miGrafico = null;
 
 // --- NUEVAS VARIABLES PARA PAGINACIÓN ---
 let paginaActual = 1;
-const registrosPorPagina = 10;
+const registrosPorPagina = 5;
 let historialFiltradoActual = []; 
 
 // 2. OBTENER DÓLAR Y ACTUALIZAR UI (Sin cambios)
