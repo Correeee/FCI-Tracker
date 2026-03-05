@@ -273,8 +273,10 @@ async function inicializarDashboard() {
                 const ultimos7 = registrosValidos.slice(-7);
                 const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
+                
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
+                
                 const vcpInicial = registroBase.vcp;
                 const dineroInicial7d = registroBase.dinero;
 
@@ -289,15 +291,24 @@ async function inicializarDashboard() {
             
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
+            
             const mensualTNAPorc = (tna / 365 * 30); 
             const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30/365) - 1) * 100;
 
             const saldoARSActual = ultimoRegistro.dinero;
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
+            
             const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
             const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
+            
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
+
+            // --- CÁLCULO DÍAS DE INVERSIÓN ---
+            const fechaInicio = new Date(historialBase[0].fecha);
+            const fechaFin = new Date(ultimoRegistro.fecha);
+            const diferenciaTiempo = Math.abs(fechaFin - fechaInicio);
+            const diasInversion = Math.ceil(diferenciaTiempo / (1000 * 60 * 60 * 24));
 
             vcpDisplay.innerHTML = `
                 <div style="font-size: 16px;">Valor Cuotaparte: <strong>$${vcpARS}</strong> | <strong>u$s ${vcpUSD}</strong></div>
@@ -325,6 +336,9 @@ async function inicializarDashboard() {
                             <span style="color: #636e72; font-size: 11px; margin-left: 4px;">
                                 (u$s ${gananciaAcumulada7dUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                             </span>
+                        </div>
+                        <div style="font-size: 11px; color: #7f8c8d; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #eee;">
+                            Tiempo invertido: <strong>${diasInversion} días</strong>
                         </div>
                         <div style="border-top: 1px dashed #ddd; margin-top: 4px; padding-top: 4px; font-size: 13px;">
                             <strong>DINERO TOTAL ACTUAL:</strong> 
