@@ -40,23 +40,46 @@
             color: red !important;
             transition: 0.2s !important;
         }
+        summary { font-size: 11px; font-weight: bold; color: #0984e3; cursor: pointer; outline: none; margin-bottom: 5px; display: list-item; }
+        summary:hover{
+            color: #1c1c1c;
+            transition: 0.2s;
+        }
+        
+        /* Suavizado del dropdown */
+        details {
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        details[open] summary ~ * {
+            animation: sweep 0.3s ease-in-out;
+        }
+
+        @keyframes sweep {
+            0%    {opacity: 0; transform: translateY(-5px)}
+            100%  {opacity: 1; transform: translateY(0)}
+        }
     </style>
 </head>
 <body>
     <div class="card">
-        <label>Usuario</label>
-        <input type="text" id="nombreUsuario" placeholder="Tu nombre">
-        <label>Categoría</label>
-        <select id="tipoFondo">
-            <option value="rentaFija">Renta Fija</option>
-            <option value="moneyMarket">Money Market</option>
-            <option value="rentaMixta">Renta Mixta</option>
-            <option value="rentaVariable">Renta Variable</option>
-        </select>
-        <label>Buscar Fondo</label>
-        <input type="text" id="buscador" placeholder="Ej: SBS, Balanz...">
-        <div id="listaFondos"></div>
-        <div id="fondoElegidoDisplay" class="selected-fondo" style="display:none"></div>
+        <details>
+            <summary>Configuración de Cuenta y Fondo</summary>
+            <label>Usuario</label>
+            <input type="text" id="nombreUsuario" placeholder="Tu nombre">
+            <label>Categoría</label>
+            <select id="tipoFondo">
+                <option value="rentaFija">Renta Fija</option>
+                <option value="moneyMarket">Money Market</option>
+                <option value="rentaMixta">Renta Mixta</option>
+                <option value="rentaVariable">Renta Variable</option>
+            </select>
+            <label>Buscar Fondo</label>
+            <input type="text" id="buscador" placeholder="Ej: SBS, Balanz...">
+            <div id="listaFondos"></div>
+            <div id="fondoElegidoDisplay" class="selected-fondo" style="display:none"></div>
+        </details>
 
         <label>Inversión (ARS)</label>
         <div style="display: flex; gap: 5px; align-items: center;">
