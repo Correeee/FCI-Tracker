@@ -1,14 +1,14 @@
 // 1. CONFIGURACIÓN Y VARIABLES GLOBALES
 const MIS_CUOTAPARTES_BACKUP = 50.188484;
-const INVERSION_INICIAL_FIJA = 1802902.48; 
-let historialBase = []; 
+const INVERSION_INICIAL_FIJA = 1802902.48;
+let historialBase = [];
 let cotizacionDolar = 0;
 let miGrafico = null;
 
 // --- NUEVAS VARIABLES PARA PAGINACIÓN ---
 let paginaActual = 1;
 const registrosPorPagina = 5;
-let historialFiltradoActual = []; 
+let historialFiltradoActual = [];
 
 // 2. OBTENER DÓLAR Y ACTUALIZAR UI (Sin cambios)
 async function obtenerDolar() {
@@ -83,7 +83,7 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     const cantDisplay = document.getElementById('cantRegistros');
     if (cantDisplay) cantDisplay.textContent = historialFiltrado.length;
     crearGrafico(historialFiltrado, cotizacionDolar);
-    
+
     const tbody = document.getElementById('cuerpoTablaFull');
     if (!tbody) return;
 
@@ -97,7 +97,7 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
         const esMovimientoManual = esSuscripcion || esRescate;
 
         let montoValor = h.ganancia || 0;
-        
+
         if (!esMovimientoManual && montoValor === 0) {
             const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
             if (idxOriginal > 0) {
@@ -117,7 +117,7 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
 
         if (esMovimientoManual) {
             variacionFinal = "---";
-            if (esSuscripcion) estiloFila = 'background-color: #f0fff4; border-left: 5px solid #27ae60;'; 
+            if (esSuscripcion) estiloFila = 'background-color: #f0fff4; border-left: 5px solid #27ae60;';
             else if (esRescate) estiloFila = 'background-color: #fff5f5; border-left: 5px solid #e74c3c;';
         }
 
@@ -206,7 +206,7 @@ function exportarAExcel(fondoNombre) {
         const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
         let gananciaARS = h.ganancia || 0;
         const esMovManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate"));
-        
+
         if (!esMovManual && gananciaARS === 0 && idxOriginal > 0) {
             gananciaARS = h.dinero - historialBase[idxOriginal - 1].dinero;
         }
@@ -238,6 +238,8 @@ function exportarAExcel(fondoNombre) {
 
 // 5. INICIALIZACIÓN
 async function inicializarDashboard() {
+    // ESTA ES LA LÍNEA QUE TENÉS QUE AGREGAR:
+    chrome.action.setBadgeText({ text: "" });
     await obtenerDolar();
     chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas'], async (res) => {
         const cuotasActuales = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
@@ -258,25 +260,25 @@ async function inicializarDashboard() {
 
         const ultimoRegistro = historialBase[historialBase.length - 1];
         const vcpDisplay = document.getElementById('vcpInfo');
-        
+
         if (vcpDisplay && ultimoRegistro.vcp) {
             const vcpARS = ultimoRegistro.vcp.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const vcpUSD = (ultimoRegistro.vcp / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            
+
             const registrosValidos = historialBase.filter(h => h.variacion !== undefined && !h.nota?.includes("Suscripción") && !h.nota?.includes("Rescate"));
-            
+
             let variacionAcumulada7d = 0;
             let gananciaAcumulada7d = 0;
             let gananciaAcumulada7dUSD = 0;
-            
+
             if (registrosValidos.length > 0) {
                 const ultimos7 = registrosValidos.slice(-7);
                 const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
-                
+
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
-                
+
                 const vcpInicial = registroBase.vcp;
                 const dineroInicial7d = registroBase.dinero;
 
@@ -288,19 +290,19 @@ async function inicializarDashboard() {
             const ultimos7Tasa = registrosValidos.slice(-7);
             const promedioDiario = ultimos7Tasa.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos7Tasa.length || 1);
             const diariaDecimal = promedioDiario / 100;
-            
+
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
-            
-            const mensualTNAPorc = (tna / 365 * 30); 
-            const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30/365) - 1) * 100;
+
+            const mensualTNAPorc = (tna / 365 * 30);
+            const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30 / 365) - 1) * 100;
 
             const saldoARSActual = ultimoRegistro.dinero;
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
-            
+
             const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
             const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
-            
+
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 

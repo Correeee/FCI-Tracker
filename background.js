@@ -17,7 +17,7 @@ async function generarIconoColor(color) {
 }
 
 // 2. Alarmas
-chrome.alarms.create("checkFCI", { periodInMinutes: 30 });
+chrome.alarms.create("checkFCI", { periodInMinutes: 60 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "checkFCI") checkUpdates();
 });
