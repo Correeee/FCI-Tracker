@@ -5,7 +5,9 @@ let saldoOculto = false;
 
 // 1. CONFIGURACIÓN INICIAL
 const INVERSION_INICIAL_PESOS = 1802902.48;
-let CUOTAPARTES_TOTALES = 50.188484; 
+let CUOTAPARTES_TOTALES = 50.188484;
+
+chrome.action.setBadgeText({ text: "" });
 
 async function obtenerDolarOficial() {
     console.log("🔍 [1] Llamando API Dólar...");
@@ -14,39 +16,39 @@ async function obtenerDolarOficial() {
         const data = await response.json();
         console.log("💵 [1] Dólar obtenido:", data.venta);
         return data.venta;
-    } catch (e) { 
+    } catch (e) {
         console.warn("⚠️ [1] Error Dólar, usando fallback 1390");
-        return 1390; 
+        return 1390;
     }
 }
 
 // Función para formatear montos con máximo 2 decimales
 function f(monto, ocultar = false) {
-    return ocultar ? "******" : monto.toLocaleString('es-AR', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+    return ocultar ? "******" : monto.toLocaleString('es-AR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
     });
 }
 
 async function renderizarDesdeStorage() {
     console.log("📦 [2] Leyendo Storage...");
     const res = await new Promise(r => chrome.storage.sync.get(['monto', 'usuario', 'historial', 'cuotas', 'saldoOculto'], r));
-    
+
     if (res.cuotas) {
         CUOTAPARTES_TOTALES = parseFloat(res.cuotas);
     }
     saldoOculto = res.saldoOculto || false;
-    
+
     const content = document.getElementById('content');
     const precioDolar = await obtenerDolarOficial();
-    
+
     if (res.historial && res.historial.length > 0) {
         const historial = res.historial;
         const ultimo = historial[historial.length - 1];
         const vcpActual = ultimo.vcp;
         const saldoActual = CUOTAPARTES_TOTALES * vcpActual;
         const gananciaTotalPesos = saldoActual - INVERSION_INICIAL_PESOS;
-        
+
         // Sincronizar inputs con 2 decimales
         document.getElementById('miInversion').value = saldoActual.toFixed(2);
         document.getElementById('valVCP').textContent = vcpActual.toFixed(2);
@@ -56,7 +58,7 @@ async function renderizarDesdeStorage() {
         const registrosValidos = historial.filter(h => h.variacion !== undefined && !h.nota?.includes("(+)") && !h.nota?.includes("(-)"));
         const ultimos7 = registrosValidos.slice(-7);
         const promedioDiario = ultimos7.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos7.length || 1);
-        
+
         const diariaDecimal = promedioDiario / 100;
         const tna = diariaDecimal * 365 * 100;
         const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
@@ -132,8 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
         miInversion.readOnly = bloqueado;
         nombreUsuarioInput.readOnly = bloqueado;
         btnGuardar.textContent = bloqueado ? "Editar" : "Guardar";
-        chrome.storage.sync.set({ 
-            monto: miInversion.value, 
+        chrome.storage.sync.set({
+            monto: miInversion.value,
             usuario: nombreUsuarioInput.value,
             isLocked: bloqueado,
             cuotas: CUOTAPARTES_TOTALES
@@ -206,9 +208,9 @@ async function cargarFondos(tipo, preseleccionado = null) {
         const response = await fetch(url);
         if (!response.ok) throw new Error("Error en API FCI: " + response.status);
         fondosData = await response.json();
-        
-        const miFondoApi = fondosData.find(f => 
-            f.fondo.toUpperCase().includes("SBS") && 
+
+        const miFondoApi = fondosData.find(f =>
+            f.fondo.toUpperCase().includes("SBS") &&
             f.fondo.toUpperCase().includes("RENTA FIJA")
         );
 
@@ -240,7 +242,7 @@ async function cargarFondos(tipo, preseleccionado = null) {
     } catch (e) { console.error("❌ [6] Error API FCI:", e.message); }
 }
 
-window.test = function() {
+window.test = function () {
 
     console.log("📡 [TEST] Consultando URL de Renta Fija...");
 

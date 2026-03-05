@@ -1,4 +1,4 @@
-// 1. Función de dibujo (Vital para los colores)
+// 1. Función de dibujo (Sin cambios)
 async function generarIconoColor(color) {
   const canvas = new OffscreenCanvas(128, 128);
   const ctx = canvas.getContext('2d');
@@ -34,90 +34,67 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 4. Lógica principal corregida (Sincronizada con la ruta del Popup)
+// 4. Lógica principal consultando MEMORIA (storage)
 async function checkUpdates(esTest = false) {
-  const res = await chrome.storage.sync.get(['monto', 'fondoNombre', 'ultimaFechaNotificada', 'tipo']);
-  if (!res.fondoNombre || !res.monto) {
-      console.warn("⚠️ Falta fondo o monto en storage");
+  // Traemos el historial guardado por la extensión
+  const res = await chrome.storage.sync.get(['fondoNombre', 'ultimaFechaNotificada', 'cuotas', 'historial']);
+  
+  if (!res.fondoNombre || !res.cuotas || !res.historial || res.historial.length === 0) {
+      console.warn("⚠️ No hay datos suficientes en la memoria de la extensión");
       return;
   }
 
   try {
-    // CORRECCIÓN: Forzamos rentaFija si no hay tipo, igual que en el popup
-    let tipo = res.tipo || 'rentaFija';
-    
-    let cotizacionOficial = 1390; 
+    let cotizacionOficial = 1425; 
 
-    // Bloque independiente para el Dólar
+    // Intentar actualizar Dólar para la conversión
     try {
         const dolarRes = await fetch(`https://dolarapi.com/v1/dolares/oficial`);
         if (dolarRes.ok) {
             const dolarData = await dolarRes.json();
             cotizacionOficial = dolarData.venta;
-            console.log("✅ Dólar actualizado:", cotizacionOficial);
         }
-    } catch (e) {
-        console.warn("⚠️ Falló API Dólar, usando fallback.");
-    }
+    } catch (e) { console.warn("Usando dólar fallback"); }
 
-    // Fetch del FCI - Usando la ruta CamelCase que confirmaste que funciona
-    console.log(`📡 Consultando FCI: ${tipo}...`);
-    const urlFCI = `https://api.argentinadatos.com/v1/finanzas/fci/${tipo}/ultimo?t=${Date.now()}`;
-    const fciRes = await fetch(urlFCI);
+    // El historial ya viene ordenado por el popup, pero nos aseguramos el más reciente primero
+    const historial = res.historial.reverse();
+
+    // BUSQUEDA EN MEMORIA: Buscamos el último registro con variación != 0
+    const registroConRendimiento = historial.find(f => f.variacion !== 0) || historial[0];
     
-    if (!fciRes.ok) {
-        throw new Error(`Error API FCI: ${fciRes.status} en ruta ${tipo}`);
-    }
-
-    const data = await fciRes.json();
+    // El saldo lo calculamos siempre con el VCP más nuevo que tengamos en memoria
+    const ultimoVCP = historial[0].vcp;
+    const fechaUltima = registroConRendimiento.fecha;
+    const variacion = registroConRendimiento.variacion;
     
-    // Buscador flexible para encontrar tu fondo
-    const miFondo = data.find(f => f.fondo.toUpperCase().includes(res.fondoNombre.toUpperCase()));
+    const misCuotas = parseFloat(res.cuotas);
+    const saldoActual = misCuotas * ultimoVCP;
     
-    const hoy = new Date().toISOString().split('T')[0];
+    // Calculamos ganancia basada en ese rendimiento encontrado
+    const gananciaPesos = (saldoActual * variacion) / 100;
+    
+    const esPositivo = variacion >= 0;
+    const color = esPositivo ? "#27ae60" : "#e74c3c";
+    const icon = await generarIconoColor(color);
+    const saldoUSD = saldoActual / cotizacionOficial;
 
-    if (miFondo) {
-      console.log("🎯 Fondo encontrado:", miFondo.fondo, "VCP:", miFondo.vcp);
+    // Solo notificar si es Test o si el cierre es nuevo
+    if (esTest || (fechaUltima !== res.ultimaFechaNotificada)) {
+      
+      chrome.notifications.create("fci_memoria_" + fechaUltima, {
+        type: 'basic',
+        iconUrl: icon,
+        title: `Saldo: $${saldoActual.toLocaleString('es-AR', {minimumFractionDigits: 2})}`,
+        message: `Cierre: ${fechaUltima.split('-').reverse().join('/')}\nRendimiento: ${esPositivo ? '▲' : '▼'} ${variacion.toFixed(2)}% (+$${gananciaPesos.toLocaleString('es-AR', {minimumFractionDigits: 2})})\nUSD: u$s ${saldoUSD.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+        priority: 2
+      });
 
-      if (esTest || (miFondo.fecha === hoy && res.ultimaFechaNotificada !== hoy)) {
-        const variacion = miFondo.variacion || 0;
-        const montoInv = parseFloat(res.monto);
-        const ganancia = (montoInv * variacion) / 100;
-        const saldoFinal = montoInv + ganancia;
-        
-        const esPositivo = variacion >= 0;
-        const color = esPositivo ? "#27ae60" : "#e74c3c";
-        const icon = await generarIconoColor(color);
-
-        const saldoUSD = saldoFinal / cotizacionOficial;
-
-        chrome.notifications.create({
-          type: 'basic',
-          iconUrl: icon,
-          title: `${esPositivo ? '🟢' : '🔴'} Saldo: $${saldoFinal.toLocaleString('es-AR', {minimumFractionDigits: 2})}`,
-          message: `Rendimiento: ${esPositivo ? '+' : ''}${variacion.toFixed(2)}% (+$${ganancia.toLocaleString('es-AR', {minimumFractionDigits: 2})})\nEquivalente: u$s ${saldoUSD.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
-          priority: 2
-        });
-
-        chrome.action.setBadgeText({ text: "!" });
-        chrome.action.setBadgeBackgroundColor({ color: color });
-        
-        if (!esTest) chrome.storage.sync.set({ ultimaFechaNotificada: hoy });
-      } else {
-          console.log("ℹ️ No hay actualización de fecha o ya fue notificado hoy.");
-      }
-    } else {
-        console.warn("⚠️ No se encontró el fondo:", res.fondoNombre);
+      chrome.action.setBadgeText({ text: "!" });
+      chrome.action.setBadgeBackgroundColor({ color: color });
+      
+      if (!esTest) chrome.storage.sync.set({ ultimaFechaNotificada: fechaUltima });
     }
   } catch (e) { 
-      console.error("❌ Error crítico en background:", e.message); 
+      console.error("❌ Error en checkUpdates:", e.message); 
   }
 }
-
-
-/* TEST: Este comando sobreescribe el valor mal guardado por el correcto
-chrome.storage.sync.set({ tipo: 'rentaFija' }, () => {
-    console.log("✅ Valor de 'tipo' corregido a rentaFija en el Storage.");
-    // Ahora ejecutamos el test de nuevo
-    checkUpdates(true);
-}); */
