@@ -67,23 +67,23 @@ async function renderizarDesdeStorage() {
         const varDiaria = ultimo.variacion || 0;
 
         content.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <div class="balance" style="font-size:28px; font-weight:bold">$${f(saldoActual, saldoOculto)}</div>
-                <span id="btnOjo" style="cursor:pointer; font-size: 20px;">${saldoOculto ? '👁️‍🗨️' : '👁️'}</span>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 15px;">
+                <div class="balance">$${f(saldoActual, saldoOculto)}</div>
+                <span id="btnOjo" style="cursor:pointer; font-size: 20px; opacity: 0.6;">${saldoOculto ? '👁️‍🗨️' : '👁️'}</span>
             </div>
-            <div style="margin-bottom: 10px; font-size: 11px; color: #636e72; line-height: 1.4; border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px;">
-                <div>Capital Inicial: <strong>$${f(INVERSION_INICIAL_PESOS, saldoOculto)}</strong></div>
-                <div>Cuotas: <strong>${CUOTAPARTES_TOTALES.toFixed(2)}</strong></div>
-                <div>Ganancia Total: 
-                    <span style="color:${posTotal ? '#27ae60' : '#d63031'}; font-weight:bold">
+            <div style="margin-bottom: 15px; font-size: 12px; color: var(--text-sub); line-height: 1.6; border-top: 1px solid #f0f0f0; padding-top: 15px; font-family:'Inter'">
+                <div style="display: flex; justify-content: space-between;">Capital Inicial: <strong style="font-family:'Inter'">$${f(INVERSION_INICIAL_PESOS, saldoOculto)}</strong></div>
+                <div style="display: flex; justify-content: space-between;">Cuotas totales: <strong style="font-family:'Inter'">${CUOTAPARTES_TOTALES.toFixed(2)}</strong></div>
+                <div style="display: flex; justify-content: space-between; margin-top: 4px;">Ganancia Total: 
+                    <span style="color:${posTotal ? 'var(--positive)' : 'var(--negative)'}; font-weight:800; font-family:'Inter'">
                         +$${f(gananciaTotalPesos, saldoOculto)} 
                     </span>
                 </div>
-                <div style="margin-top: 4px; border-top: 1px dashed #eee; padding-top: 4px; color: #2d3436;">
-                    Promedio (7d): <span style="color:#27ae60">TNA: ${tna.toFixed(1)}%</span> | <span style="color:#0984e3">TEA: ${tea.toFixed(1)}%</span>
+                <div style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 10px; color: var(--text-main); font-weight: 600; text-align: center;">
+                    Promedio (7d): <span style="color:var(--positive)">TNA ${tna.toFixed(1)}%</span> | <span style="color:#0984e3">TEA ${tea.toFixed(1)}%</span>
                 </div>
             </div>
-            <div style="color:${varDiaria >= 0 ? '#27ae60' : '#d63031'}; font-weight:bold; background: ${varDiaria >= 0 ? '#eafff2' : '#fff0f0'}; padding: 5px 12px; border-radius: 6px; display: inline-block; font-size: 13px;">
+            <div style="color:${varDiaria >= 0 ? 'var(--positive)' : 'var(--negative)'}; font-weight:800; background: ${varDiaria >= 0 ? '#eafff2' : '#fff0f0'}; padding: 6px 16px; border-radius: 10px; display: inline-block; font-size: 13px; font-family:'Inter'">
                 Hoy: ${varDiaria >= 0 ? '▲' : '▼'} ${Math.abs(varDiaria).toFixed(2)}%
             </div>
         `;
@@ -241,57 +241,3 @@ async function cargarFondos(tipo, preseleccionado = null) {
         }
     } catch (e) { console.error("❌ [6] Error API FCI:", e.message); }
 }
-
-window.test = function () {
-
-    console.log("📡 [TEST] Consultando URL de Renta Fija...");
-
-    fetch('https://api.argentinadatos.com/v1/finanzas/fci/rentaFija/ultimo')
-
-        .then(response => {
-
-            if (!response.ok) throw new Error("Status: " + response.status);
-
-            return response.json();
-
-        })
-
-        .then(data => {
-
-            console.log("✅ [TEST] Datos recibidos (Lista General):");
-
-            console.table(data.slice(0, 50));
-
-
-
-            const miFondo = data.find(f =>
-
-                f.fondo.toUpperCase().includes("SBS") &&
-
-                f.fondo.toUpperCase().includes("RENTA FIJA")
-
-            );
-
-
-
-            if (miFondo) {
-
-                console.log("%c🎯 [TEST] Datos de mi FCI seleccionado:", "color:#27ae60; font-weight:bold;");
-
-                console.table([miFondo]);
-
-            } else {
-
-                console.warn("⚠️ [TEST] No se encontró el fondo exacto.");
-
-                const parecidos = data.filter(f => f.fondo.toUpperCase().includes("SBS"));
-
-                console.table(parecidos);
-
-            }
-
-        })
-
-        .catch(error => console.error("❌ [TEST] Falló:", error));
-
-};
