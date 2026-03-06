@@ -173,16 +173,39 @@
             right: 40px;
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
         }
-        .dolar__badge{
+
+        .dolar__badge {
             display: flex;
             flex-direction: row;
             justify-content: space-between;
             align-items: center;
             gap: 20px;
         }
-        .btn-dropdown:hover, #btnExportar:hover, #btnSiguiente:hover, #btnAnterior:hover{
+
+        .btn-dropdown:hover,
+        #btnExportar:hover {
             background: #6E6E6E !important;
             transition: 0.2s !important;
+        }
+
+        #btnSiguiente:hover,
+        #btnAnterior:hover {
+            background: black !important;
+            transition: 0.2s !important;
+            color: white
+        }
+
+        #tarjeta-totales {
+            /* Overlay negro al 50% de opacidad combinado con la imagen */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7)),
+                url("background/background.webp") !important;
+            background-color: transparent !important;
+            background-size: cover !important;
+            background-position: center !important;
+            color: white !important;
+            /* Asegura que el texto sea blanco */
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8) !important;
+            /* Agrega una sombra al texto para mayor contraste */
         }
     </style>
 </head>
