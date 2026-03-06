@@ -20,7 +20,7 @@ async function obtenerDolar() {
         const dolarDisplay = document.getElementById('cotizacionHoy');
         if (dolarDisplay) {
             // Mostramos ambos valores en el encabezado
-            dolarDisplay.textContent = `Dólar Oficial: Compra $${data.compra} | Venta $${data.venta}`;
+            dolarDisplay.textContent = `Dólar Oficial: Compra $${data.compra.toFixed(2)} | Venta $${data.venta.toFixed(2)}`;
         }
         return data.venta;
     } catch (e) {
@@ -73,7 +73,7 @@ function crearGrafico(historial, precioDolar) {
                     position: 'left',
                     ticks: { 
                         font: { family: 'Inter', size: 10 },
-                        callback: v => '$' + v.toLocaleString('es-AR') 
+                        callback: v => '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) 
                     },
                     grid: { display: false }
                 }, 
@@ -83,7 +83,7 @@ function crearGrafico(historial, precioDolar) {
                     position: 'right',
                     ticks: { 
                         font: { family: 'Inter', size: 10 },
-                        callback: v => 'u$s ' + v.toLocaleString('en-US') 
+                        callback: v => 'u$s ' + v.toLocaleString('en-US', { maximumFractionDigits: 2 }) 
                     },
                     grid: { display: false }
                 },
@@ -117,12 +117,17 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
                 if (idx > 0) ganancia = h.dinero - historialBase[idx - 1].dinero;
             }
             const acum = h.dinero - INVERSION_INICIAL_FIJA;
+            const gananciaUSD = ganancia / cotizacionDolar;
+
             return `
                 <tr>
                     <td style="font-weight: 600;">${h.fecha.split('-').reverse().join('/')}</td>
-                    <td><span style="font-family:'Inter'; font-size:18px;">$${h.dinero.toLocaleString('es-AR')}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">VCP: $${h.vcp.toFixed(2)}</small></td>
-                    <td><span style="font-family:'Inter'; font-size:18px; color:#27ae60;">u$s ${(h.dinero/cotizacionDolar).toFixed(2)}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">Acum: $${acum.toLocaleString('es-AR')}</small></td>
-                    <td style="font-weight: 600; color: ${ganancia >= 0 ? '#27ae60' : '#d63031'}">$${ganancia.toLocaleString('es-AR')}</td>
+                    <td><span style="font-family:'Inter'; font-size:18px;">$${h.dinero.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">VCP: $${h.vcp.toFixed(2)}</small></td>
+                    <td><span style="font-family:'Inter'; font-size:18px; color:#27ae60;">u$s ${(h.dinero/cotizacionDolar).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">Acum: $${acum.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</small></td>
+                    <td style="font-weight: 600; color: ${ganancia >= 0 ? '#27ae60' : '#d63031'}">
+                        $${ganancia.toLocaleString('es-AR', { maximumFractionDigits: 2 })}<br>
+                        <small style="opacity:0.8">u$s ${gananciaUSD.toLocaleString('en-US', { maximumFractionDigits: 2 })}</small>
+                    </td>
                     <td style="font-weight: 700; color: ${h.variacion >= 0 ? '#27ae60' : '#d63031'}">${h.variacion >= 0 ? '▲' : '▼'} ${Math.abs(h.variacion).toFixed(2)}%</td>
                 </tr>`;
         }).join('');
@@ -166,7 +171,7 @@ function exportarAExcel(fondoNombre) {
         <table border="1">
             <tr style="background-color: #000; color: white; font-weight: bold; text-align: center;">
                 <th>Fecha</th><th>VCP</th><th>Dinero Total (ARS)</th><th>Dinero Total (USD)</th>
-                <th>Ganancia Diaria (ARS)</th><th>Variacion %</th>
+                <th>Ganancia Diaria (ARS)</th><th>Ganancia Diaria (USD)</th><th>Variacion %</th>
             </tr>`;
     [...historialBase].reverse().forEach((h) => {
         let gananciaARS = h.ganancia || 0;
@@ -174,6 +179,8 @@ function exportarAExcel(fondoNombre) {
             const idx = historialBase.findIndex(item => item.fecha === h.fecha);
             if (idx > 0) gananciaARS = h.dinero - historialBase[idx - 1].dinero;
         }
+        const gananciaUSD = gananciaARS / cotizacionDolar;
+
         html += `
             <tr>
                 <td style="text-align: center;">${h.fecha.split('-').reverse().join('/')}</td>
@@ -181,6 +188,7 @@ function exportarAExcel(fondoNombre) {
                 <td style="text-align: right;">$${h.dinero.toFixed(2)}</td>
                 <td style="text-align: right;">u$s ${(h.dinero / cotizacionDolar).toFixed(2)}</td>
                 <td style="text-align: right; color: ${gananciaARS >= 0 ? '#27ae60' : '#d63031'};">$${gananciaARS.toFixed(2)}</td>
+                <td style="text-align: right; color: ${gananciaARS >= 0 ? '#27ae60' : '#d63031'};">u$s ${gananciaUSD.toFixed(2)}</td>
                 <td style="text-align: center;">${(h.variacion || 0).toFixed(2)}%</td>
             </tr>`;
     });
@@ -244,17 +252,17 @@ async function inicializarDashboard() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                             <div>
                                 <span style="display: block; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family:'Inter'">Balance Total</span>
-                                <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR')}</span>
+                                <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: #27ae60; margin-bottom: 2px;">+ $${ganTotal.toLocaleString('es-AR')}</span>
-                                <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toFixed(2)}</span>
+                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: #27ae60; margin-bottom: 2px;">+ $${ganTotal.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                                <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
                         <div style="font-size: 12px; opacity: 0.7; border-top: 1px solid #333; padding-top: 20px; display: flex; gap: 30px; font-family:'Inter'; font-weight:500;">
                             <span style="display: flex; align-items: center; gap: 6px;">Tendencia (7d): <strong style="color:#27ae60; font-weight:700;">▲ ${variacion7dReal.toFixed(2)}%</strong></span>
                             <span>Invertido: <strong style="color:#fff">${dias} días</strong></span>
-                            <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR')}</strong></span>
+                            <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</strong></span>
                         </div>
                     </div>
                 </div>`;
@@ -316,7 +324,7 @@ document.querySelectorAll('.toggle-vis').forEach(cb => {
         
         chrome.storage.sync.get(['visibilidadDashboard'], (r) => {
             let v = r.visibilidadDashboard || {};
-            v[id] = isChecked;
+            v[id] = this.checked;
             chrome.storage.sync.set({ visibilidadDashboard: v });
         });
     };
