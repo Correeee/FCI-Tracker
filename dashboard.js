@@ -1,340 +1,216 @@
-// 1. CONFIGURACIÓN Y VARIABLES GLOBALES
+// 1. VARIABLES GLOBALES
 const MIS_CUOTAPARTES_BACKUP = 50.188484;
 const INVERSION_INICIAL_FIJA = 1802902.48;
 let historialBase = [];
 let cotizacionDolar = 0;
 let miGrafico = null;
-
-// --- NUEVAS VARIABLES PARA PAGINACIÓN ---
 let paginaActual = 1;
 const registrosPorPagina = 5;
 let historialFiltradoActual = [];
 
-// 2. OBTENER DÓLAR Y ACTUALIZAR UI
+// 2. DÓLAR
 async function obtenerDolar() {
     try {
         const response = await fetch('https://dolarapi.com/v1/dolares/oficial');
         const data = await response.json();
         cotizacionDolar = data.venta;
-        const dolarDisplay = document.getElementById('cotizacionHoy') || document.querySelector('.dolar-oficial-valor');
-        if (dolarDisplay) {
-            dolarDisplay.textContent = `Dólar Oficial: $${data.venta}`;
-        }
+        if (document.getElementById('cotizacionHoy')) document.getElementById('cotizacionHoy').textContent = `Dólar Oficial: $${data.venta}`;
         return data.venta;
     } catch (e) {
-        console.warn("⚠️ Usando respaldo de dólar $1390");
-        cotizacionDolar = 1390;
-        return 1390;
+        cotizacionDolar = 1425;
+        return 1425;
     }
 }
 
-// 3. GENERAR / ACTUALIZAR GRÁFICO
+// 3. GRÁFICO (Ejes ARS y USD restaurados)
 function crearGrafico(historial, precioDolar) {
     const canvas = document.getElementById('graficoEvolucion');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (miGrafico) miGrafico.destroy();
-    const labels = historial.map(h => h.fecha.split('-').reverse().slice(0, 2).join('/'));
-    const datosARS = historial.map(h => h.dinero);
-    const datosUSD = historial.map(h => h.dinero / precioDolar);
     miGrafico = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Saldo ARS',
-                    data: datosARS,
-                    borderColor: '#0984e3',
-                    backgroundColor: 'rgba(9, 132, 227, 0.05)',
-                    borderWidth: 3,
-                    yAxisID: 'y',
-                    tension: 0.3,
-                    fill: true
-                },
-                {
-                    label: 'Saldo USD',
-                    data: datosUSD,
-                    borderColor: '#27ae60',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    yAxisID: 'y1',
-                    tension: 0.3,
-                    pointRadius: 2
-                }
-            ]
+            labels: historial.map(h => h.fecha.split('-').reverse().slice(0, 2).join('/')),
+            datasets: [{
+                label: 'ARS',
+                data: historial.map(h => h.dinero),
+                borderColor: '#000',
+                borderWidth: 3,
+                tension: 0.4,
+                pointRadius: 0,
+                fill: false,
+                yAxisID: 'y'
+            },
+            {
+                label: 'USD',
+                data: historial.map(h => h.dinero / precioDolar),
+                borderColor: '#27ae60',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                tension: 0.4,
+                pointRadius: 0,
+                yAxisID: 'y1',
+                fill: false
+            }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: { type: 'linear', position: 'left', ticks: { callback: v => '$' + v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
-                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => 'u$s ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }
+            plugins: { legend: { display: false } },
+            scales: { 
+                y: { 
+                    type: 'linear',
+                    display: true, 
+                    position: 'left',
+                    ticks: { 
+                        font: { family: 'Inter', size: 10 },
+                        callback: v => '$' + v.toLocaleString('es-AR') 
+                    },
+                    grid: { display: false }
+                }, 
+                y1: { 
+                    type: 'linear',
+                    display: true, 
+                    position: 'right',
+                    ticks: { 
+                        font: { family: 'Inter', size: 10 },
+                        callback: v => 'u$s ' + v.toLocaleString('en-US') 
+                    },
+                    grid: { display: false }
+                },
+                x: { 
+                    grid: { display: false }, 
+                    ticks: { font: { family: 'Inter', size: 10 } } 
+                } 
             }
         }
     });
 }
 
-// 4. FUNCIÓN DE RENDERIZADO (Tabla)
+// 4. RENDERIZADO TABLA
 function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     if (reiniciarPagina) paginaActual = 1;
     historialFiltradoActual = historialFiltrado;
-
-    const cantDisplay = document.getElementById('cantRegistros');
-    if (cantDisplay) cantDisplay.textContent = historialFiltrado.length;
+    document.getElementById('cantRegistros').textContent = historialFiltrado.length;
     crearGrafico(historialFiltrado, cotizacionDolar);
 
-    const tbody = document.getElementById('cuerpoTablaFull');
-    if (!tbody) return;
-
     const inicio = (paginaActual - 1) * registrosPorPagina;
-    const fin = inicio + registrosPorPagina;
-    const historialSegmentado = [...historialFiltrado].reverse().slice(inicio, fin);
+    const segmentado = [...historialFiltrado].reverse().slice(inicio, inicio + registrosPorPagina);
 
-    tbody.innerHTML = historialSegmentado.map((h) => {
-        const esSuscripcion = h.nota && h.nota.includes("Suscripción");
-        const esRescate = h.nota && h.nota.includes("Rescate");
-        const esMovimientoManual = esSuscripcion || esRescate;
-
-        let montoValor = h.ganancia || 0;
-
-        if (!esMovimientoManual && montoValor === 0) {
-            const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
-            if (idxOriginal > 0) {
-                const previo = historialBase[idxOriginal - 1];
-                montoValor = h.dinero - previo.dinero;
-            }
+    document.getElementById('cuerpoTablaFull').innerHTML = segmentado.map((h) => {
+        let ganancia = h.ganancia || 0;
+        if (ganancia === 0) {
+            const idx = historialBase.findIndex(item => item.fecha === h.fecha);
+            if (idx > 0) ganancia = h.dinero - historialBase[idx - 1].dinero;
         }
-
-        let etiquetaTipo = esMovimientoManual ? h.nota : "Ganancia Diaria";
-        let subtextoDesc = esMovimientoManual ? "Movimiento de Capital" : `u$s ${(montoValor / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        let claseCSS = montoValor >= 0 ? 'positive' : 'negative';
-        let variacionFinal = (h.variacion || 0).toFixed(2) + "%";
-        let estiloFila = "";
-
-        const gananciaAcumulada = h.dinero - INVERSION_INICIAL_FIJA;
-        const claseAcumulada = gananciaAcumulada >= 0 ? 'positive' : 'negative';
-
-        if (esMovimientoManual) {
-            variacionFinal = "---";
-            if (esSuscripcion) estiloFila = 'background-color: #f0fff4; border-left: 5px solid #27ae60;';
-            else if (esRescate) estiloFila = 'background-color: #fff5f5; border-left: 5px solid #e74c3c;';
-        }
-
+        const acum = h.dinero - INVERSION_INICIAL_FIJA;
         return `
-            <tr style="${estiloFila}">
-                <td>${h.fecha.split('-').reverse().join('/')}</td>
-                <td>
-                    <span class="total-cell">$${h.dinero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <div style="font-size: 10px; color: #7f8c8d; margin-top: 4px;">
-                        VCP: <strong>$${h.vcp.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                    </div>
-                </td>
-                <td>
-                    <div class="usd-cell">u$s ${(h.dinero / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    <div style="font-size: 10px; color: #7f8c8d; margin-top: 4px;">
-                        Acum.: <strong class="${claseAcumulada}">$${gananciaAcumulada.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                    </div>
-                </td>
-                <td class="${claseCSS}">
-                    <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; opacity: 0.7; margin-bottom: 3px;">
-                        ${etiquetaTipo}
-                    </div>
-                    <strong>$${montoValor.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                    <br><small style="font-size: 10px;">(${subtextoDesc})</small>
-                </td>
-                <td class="${claseCSS}" style="font-weight: bold; font-size: 13px;">
-                    ${esMovimientoManual ? '---' : (h.variacion >= 0 ? '▲ ' : '▼ ') + variacionFinal}
-                </td>
-            </tr>
-        `;
+            <tr>
+                <td style="font-weight: 600;">${h.fecha.split('-').reverse().join('/')}</td>
+                <td><span style="font-family:'Inter'; font-size:18px;">$${h.dinero.toLocaleString('es-AR')}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">VCP: $${h.vcp.toFixed(2)}</small></td>
+                <td><span style="font-family:'Inter'; font-size:18px; color:#27ae60;">u$s ${(h.dinero/cotizacionDolar).toFixed(2)}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">Acum: $${acum.toLocaleString('es-AR')}</small></td>
+                <td style="font-weight: 600; color: ${ganancia >= 0 ? '#27ae60' : '#d63031'}">$${ganancia.toLocaleString('es-AR')}</td>
+                <td style="font-weight: 700; color: ${h.variacion >= 0 ? '#27ae60' : '#d63031'}">${h.variacion >= 0 ? '▲' : '▼'} ${h.variacion.toFixed(2)}%</td>
+            </tr>`;
     }).join('');
-
     renderizarControlesPaginacion();
 }
 
 function renderizarControlesPaginacion() {
+    const total = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
     const contenedor = document.getElementById('controlesPaginacion');
     if (!contenedor) return;
-    const totalPaginas = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
+
     contenedor.innerHTML = `
-        <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; padding-bottom: 20px;">
-            <button id="btnPrev" ${paginaActual === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; background: white;">Anterior</button>
-            <span style="font-size: 13px; font-weight: bold; color: #2d3436;">${paginaActual} / ${totalPaginas || 1}</span>
-            <button id="btnNext" ${paginaActual >= totalPaginas ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; background: white;">Siguiente</button>
-        </div>
-    `;
-    document.getElementById('btnPrev').onclick = () => {
-        if (paginaActual > 1) {
-            paginaActual--;
-            renderizarDashboard(historialFiltradoActual);
-        }
-    };
-    document.getElementById('btnNext').onclick = () => {
-        const totalPaginas = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
-        if (paginaActual < totalPaginas) {
-            paginaActual++;
-            renderizarDashboard(historialFiltradoActual);
-        }
-    };
+        <div style="display: flex; justify-content: center; gap: 15px; margin: 25px 0;">
+            <button id="btnAnterior" style="font-family:'Inter'; background:none; border:1px solid #eee; padding:8px 18px; border-radius:12px; cursor:pointer; font-weight:600; font-size:13px;" ${paginaActual === 1 ? 'disabled' : ''}>Anterior</button>
+            <span style="font-weight: 700; font-family:'Inter'; font-size:14px; align-self:center;">${paginaActual} / ${total || 1}</span>
+            <button id="btnSiguiente" style="font-family:'Inter'; background:none; border:1px solid #eee; padding:8px 18px; border-radius:12px; cursor:pointer; font-weight:600; font-size:13px;" ${paginaActual >= total ? 'disabled' : ''}>Siguiente</button>
+        </div>`;
+
+    document.getElementById('btnAnterior').onclick = () => cambiarPagina(-1);
+    document.getElementById('btnSiguiente').onclick = () => cambiarPagina(1);
 }
 
-// --- FUNCIÓN PARA EXPORTAR EXCEL ---
-function exportarAExcel(fondoNombre) {
-    if (!historialBase || historialBase.length === 0) return alert("No hay datos para exportar");
-    const hoy = new Date().toLocaleDateString('es-AR').replace(/\//g, '-');
-    const filename = `${fondoNombre} - ${hoy}.xls`;
-    let html = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head><meta charset="UTF-8"></head>
-        <body>
-        <table border="1">
-            <tr style="background-color: #0984e3; color: white; font-weight: bold; text-align: center;">
-                <th>Fecha</th><th>VCP</th><th>Dinero Total (ARS)</th><th>Dinero Total (USD)</th>
-                <th>Ganancia Diaria (ARS)</th><th>Ganancia Diaria (USD)</th><th>Variacion %</th><th>Nota</th>
-            </tr>`;
-    [...historialBase].reverse().forEach((h, idx) => {
-        const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
-        let gananciaARS = h.ganancia || 0;
-        const esMovManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate"));
-        if (!esMovManual && gananciaARS === 0 && idxOriginal > 0) {
-            gananciaARS = h.dinero - historialBase[idxOriginal - 1].dinero;
-        }
-        const colorTexto = gananciaARS >= 0 ? "#27ae60" : "#d63031";
-        const bgColor = esMovManual ? "#f1f2f6" : "#ffffff";
-        html += `
-            <tr style="background-color: ${bgColor};">
-                <td style="text-align: center;">${h.fecha.split('-').reverse().join('/')}</td>
-                <td style="text-align: right;">$${h.vcp.toFixed(2)}</td>
-                <td style="text-align: right; font-weight: bold; color: #0984e3;">$${h.dinero.toFixed(2)}</td>
-                <td style="text-align: right; color: #27ae60;">u$s ${(h.dinero / cotizacionDolar).toFixed(2)}</td>
-                <td style="text-align: right; font-weight: bold; color: ${colorTexto};">$${gananciaARS.toFixed(2)}</td>
-                <td style="text-align: right; color: ${colorTexto};">u$s ${(gananciaARS / cotizacionDolar).toFixed(2)}</td>
-                <td style="text-align: center; color: ${colorTexto};">${(h.variacion || 0).toFixed(2)}%</td>
-                <td>${h.nota || ""}</td>
-            </tr>`;
-    });
-    html += `</table></body></html>`;
-    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+function cambiarPagina(dir) {
+    const total = Math.ceil(historialFiltradoActual.length / registrosPorPagina);
+    const nuevaPagina = paginaActual + dir;
+    if (nuevaPagina >= 1 && nuevaPagina <= total) {
+        paginaActual = nuevaPagina;
+        renderizarDashboard(historialFiltradoActual);
+    }
 }
 
 // 5. INICIALIZACIÓN
 async function inicializarDashboard() {
     chrome.action.setBadgeText({ text: "" });
     await obtenerDolar();
-    chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas'], async (res) => {
-        const cuotasActuales = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
-        if (!res.historial || res.historial.length === 0) return;
-
-        historialBase = res.historial.map(h => ({
-            ...h,
-            dinero: h.dinero || (h.vcp * cuotasActuales)
-        }));
-
-        if (res.usuario) document.getElementById('displayUsuario').textContent = res.usuario;
-        if (res.fondoNombre) document.getElementById('badgeFondo').textContent = res.fondoNombre;
-
-        const btnExportar = document.getElementById('btnExportar');
-        if (btnExportar) {
-            btnExportar.onclick = () => exportarAExcel(res.fondoNombre || "FCI");
+    chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas', 'visibilidadDashboard'], async (res) => {
+        const cuotas = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
+        historialBase = res.historial.map(h => ({ ...h, dinero: h.dinero || (h.vcp * cuotas) }));
+        
+        if (res.visibilidadDashboard) {
+            Object.keys(res.visibilidadDashboard).forEach(id => {
+                const el = document.getElementById(id);
+                const cb = document.querySelector(`.toggle-vis[data-target="${id}"]`);
+                if (el) el.style.display = res.visibilidadDashboard[id] ? 'block' : 'none';
+                if (cb) cb.checked = res.visibilidadDashboard[id];
+            });
         }
 
-        const ultimoRegistro = historialBase[historialBase.length - 1];
-        const vcpDisplay = document.getElementById('vcpInfo');
+        document.getElementById('displayUsuario').textContent = res.usuario || "Maxi";
+        document.getElementById('badgeFondo').textContent = res.fondoNombre || "SBS";
 
-        if (vcpDisplay && ultimoRegistro.vcp) {
-            const vcpARS = ultimoRegistro.vcp.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const vcpUSD = (ultimoRegistro.vcp / cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const ultimo = historialBase[historialBase.length - 1];
+        const validos = historialBase.filter(h => h.variacion !== undefined);
+        const ganTotal = ultimo.dinero - INVERSION_INICIAL_FIJA;
+        const prom7 = validos.slice(-7).reduce((acc, c) => acc + c.variacion, 0) / (validos.slice(-7).length || 1);
+        const tna = prom7 * 365;
+        const mensualEf = (Math.pow(1 + (prom7/100), 30) - 1) * 100;
+        const dias = Math.ceil(Math.abs(new Date(ultimo.fecha) - new Date(historialBase[0].fecha)) / 86400000);
 
-            const registrosValidos = historialBase.filter(h => h.variacion !== undefined && !h.nota?.includes("Suscripción") && !h.nota?.includes("Rescate"));
-
-            // --- LÓGICA DE GANANCIA ACUMULADA TOTAL (CORREGIDA) ---
-            const gananciaAcumuladaTOTAL = ultimoRegistro.dinero - INVERSION_INICIAL_FIJA;
-            const gananciaAcumuladaTOTALUSD = gananciaAcumuladaTOTAL / cotizacionDolar;
-
-            let variacionAcumulada7d = 0;
-            if (registrosValidos.length > 0) {
-                const ultimos7 = registrosValidos.slice(-7);
-                const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
-                const indexPrimero = historialBase.indexOf(ultimos7[0]);
-                const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
-                const vcpInicial = registroBase.vcp;
-                variacionAcumulada7d = ((vcpFinal - vcpInicial) / vcpInicial) * 100;
-            }
-
-            const ultimos7Tasa = registrosValidos.slice(-7);
-            const promedioDiario = ultimos7Tasa.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos7Tasa.length || 1);
-            const diariaDecimal = promedioDiario / 100;
-            const tna = diariaDecimal * 365 * 100;
-            const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
-            const mensualTNAPorc = (tna / 365 * 30);
-            const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30 / 365) - 1) * 100;
-
-            const saldoARSActual = ultimoRegistro.dinero;
-            const saldoUSDActual = saldoARSActual / cotizacionDolar;
-            const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
-            const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
-            const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
-            const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
-
-            const fechaInicio = new Date(historialBase[0].fecha);
-            const fechaFin = new Date(ultimoRegistro.fecha);
-            const diferenciaTiempo = Math.abs(fechaFin - fechaInicio);
-            const diasInversion = Math.ceil(diferenciaTiempo / (1000 * 60 * 60 * 24));
-
-            vcpDisplay.innerHTML = `
-                <div style="font-size: 16px;">Valor Cuotaparte: <strong>$${vcpARS}</strong> | <strong>u$s ${vcpUSD}</strong></div>
-                <div style="margin-top: 8px; color: #2d3436; font-size: 13px; line-height: 1.6;">
-                    <div>Rendimiento proyectado (Promedio 7d): 
-                        <span class="positive" style="font-weight: bold;">TNA: ${tna.toFixed(2)}%</span> | 
-                        <span class="positive" style="color: #0984e3; font-weight: bold;">TEA: ${tea.toFixed(2)}%</span>
+        document.getElementById('vcpInfo').innerHTML = `
+            <div style="margin-top: 25px; display: flex; flex-direction: column; gap: 20px;">
+                <div style="font-family: 'Inter'; font-size: 28px; font-weight: 300; letter-spacing:-0.5px;">$${ultimo.vcp.toFixed(2)} <span style="font-family: 'Inter'; font-size: 14px; color: #888; font-weight: 500; letter-spacing:0;">ARS/Cuota</span></div>
+                
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <div id="rendimiento-proyectado" style="background: #f7f7f7; padding: 16px 24px; border-radius: 20px; border: 1px solid #eee; flex: 1; min-width: 220px;">
+                        <span style="display: block; font-size: 10px; font-weight: 800; color: #999; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; font-family:'Inter'">Rendimiento (7d)</span>
+                        <span style="color: #27ae60; font-weight: 300; font-family:'Inter'; font-size: 18px;">TNA: ${tna.toFixed(2)}% | TEA: ${(tna*1.1).toFixed(2)}%</span>
                     </div>
-                    <div style="font-size: 11px; margin-top: 4px; color: #636e72; background: #ebf5fb; padding: 4px 10px; border-radius: 4px; display: inline-block;">
-                        Proyección mensual (30d): 
-                        Nominal: <strong style="color: #2980b9;">${mensualTNAPorc.toFixed(2)}%</strong> | 
-                        Efectivo: <strong style="color: #27ae60;">${mensualTEAPorc.toFixed(2)}%</strong>
-                    </div>
-                    <div style="margin-top: 8px; padding: 5px 12px; background: #f8f9fa; border-radius: 6px; display: block; border: 1px solid #e9ecef;">
-                        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                            Tendencia (7d): 
-                            <strong style="color: ${variacionAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
-                                ${variacionAcumulada7d >= 0 ? '▲' : '▼'} ${variacionAcumulada7d.toFixed(2)}%
-                            </strong>
-                            <span style="margin: 0 8px; color: #ccc;">|</span>
-                            Ganancia acumulada TOTAL: 
-                            <strong style="color: ${gananciaAcumuladaTOTAL >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
-                                +$${gananciaAcumuladaTOTAL.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </strong>
-                            <span style="color: #636e72; font-size: 11px; margin-left: 4px;">
-                                (u$s ${gananciaAcumuladaTOTALUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                            </span>
-                        </div>
-                        <div style="font-size: 11px; color: #7f8c8d; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #eee;">
-                            Tiempo invertido: <strong>${diasInversion} días</strong>
-                        </div>
-                        <div style="border-top: 1px dashed #ddd; margin-top: 4px; padding-top: 4px; font-size: 13px;">
-                            <strong>DINERO TOTAL ACTUAL:</strong> 
-                            <span style="color: #2d3436;">$${saldoARSActual.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
-                            <span style="color: #27ae60;">u$s ${saldoUSDActual.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px; font-size: 12px;">
-                            <strong>Proyección Saldo (30d):</strong> 
-                            Nominal: <span style="color: #2980b9; font-weight: bold;">$${proyARS_Nominal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
-                            Efectiva: <span style="color: #27ae60; font-weight: bold;">$${proyARS_Efectiva.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
+                    
+                    <div id="proyeccion-mensual" style="background: #f7f7f7; padding: 16px 24px; border-radius: 20px; border: 1px solid #eee; flex: 1; min-width: 220px;">
+                        <span style="display: block; font-size: 10px; font-weight: 800; color: #999; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; font-family:'Inter'">Proyección Mensual</span>
+                        <span style="font-weight: 300; font-family:'Inter'; font-size: 18px;">Efectiva: ${mensualEf.toFixed(2)}%</span>
                     </div>
                 </div>
-            `;
-        }
 
+                <div id="tarjeta-totales" style="margin-top: 5px; padding: 32px; background: #000; color: #fff; border-radius: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.12);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                        <div>
+                            <span style="display: block; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family:'Inter'">Balance Total</span>
+                            <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR')}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="display: block; font-family:'Inter'; font-size: 22px; color: #27ae60; margin-bottom: 2px;">+ $${ganTotal.toLocaleString('es-AR')}</span>
+                            <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.7; border-top: 1px solid #333; padding-top: 20px; display: flex; gap: 30px; font-family:'Inter'; font-weight:500;">
+                        <span style="display: flex; align-items: center; gap: 6px;">Tendencia (7d): <strong style="color:#27ae60; font-weight:700;">▲ ${prom7.toFixed(2)}%</strong></span>
+                        <span>Invertido: <strong style="color:#fff">${dias} días</strong></span>
+                        <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR')}</strong></span>
+                    </div>
+                </div>
+            </div>`;
+        
         renderizarDashboard(historialBase, true);
 
+        // --- LÓGICA DE FILTRO POR FECHA ---
         const fDesde = document.getElementById('fechaDesde');
         const fHasta = document.getElementById('fechaHasta');
+        
         const aplicarFiltro = () => {
             const desde = fDesde.value;
             const hasta = fHasta.value;
@@ -346,8 +222,10 @@ async function inicializarDashboard() {
             });
             renderizarDashboard(filtrado, true);
         };
+
         fDesde.addEventListener('change', aplicarFiltro);
         fHasta.addEventListener('change', aplicarFiltro);
+
         document.getElementById('resetFiltro').onclick = () => {
             fDesde.value = '';
             fHasta.value = '';
@@ -356,6 +234,27 @@ async function inicializarDashboard() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(inicializarDashboard, 150);
+// EVENTOS VISIBILIDAD
+const btnVis = document.getElementById('btnVisibilidad');
+const menuVis = document.getElementById('menuVisibilidad');
+btnVis.onclick = (e) => { 
+    e.stopPropagation(); 
+    menuVis.style.display = (menuVis.style.display === 'none' || menuVis.style.display === '') ? 'block' : 'none'; 
+};
+document.onclick = () => menuVis.style.display = 'none';
+menuVis.onclick = (e) => e.stopPropagation();
+
+document.querySelectorAll('.toggle-vis').forEach(cb => {
+    cb.onchange = function() {
+        const id = this.getAttribute('data-target');
+        const el = document.getElementById(id);
+        if (el) el.style.display = this.checked ? 'block' : 'none';
+        chrome.storage.sync.get(['visibilidadDashboard'], (r) => {
+            let v = r.visibilidadDashboard || {};
+            v[id] = this.checked;
+            chrome.storage.sync.set({ visibilidadDashboard: v });
+        });
+    };
 });
+
+document.addEventListener('DOMContentLoaded', () => setTimeout(inicializarDashboard, 150));
