@@ -10,7 +10,7 @@ let paginaActual = 1;
 const registrosPorPagina = 5;
 let historialFiltradoActual = [];
 
-// 2. OBTENER DÓLAR Y ACTUALIZAR UI (Sin cambios)
+// 2. OBTENER DÓLAR Y ACTUALIZAR UI
 async function obtenerDolar() {
     try {
         const response = await fetch('https://dolarapi.com/v1/dolares/oficial');
@@ -28,7 +28,7 @@ async function obtenerDolar() {
     }
 }
 
-// 3. GENERAR / ACTUALIZAR GRÁFICO (Sin cambios)
+// 3. GENERAR / ACTUALIZAR GRÁFICO
 function crearGrafico(historial, precioDolar) {
     const canvas = document.getElementById('graficoEvolucion');
     if (!canvas) return;
@@ -75,7 +75,7 @@ function crearGrafico(historial, precioDolar) {
     });
 }
 
-// 4. FUNCIÓN DE RENDERIZADO (Actualizada con VCP por día)
+// 4. FUNCIÓN DE RENDERIZADO (Tabla)
 function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     if (reiniciarPagina) paginaActual = 1;
     historialFiltradoActual = historialFiltrado;
@@ -179,41 +179,29 @@ function renderizarControlesPaginacion() {
     };
 }
 
-// --- FUNCIÓN PARA EXPORTAR EXCEL CON COLORES ---
+// --- FUNCIÓN PARA EXPORTAR EXCEL ---
 function exportarAExcel(fondoNombre) {
     if (!historialBase || historialBase.length === 0) return alert("No hay datos para exportar");
-
     const hoy = new Date().toLocaleDateString('es-AR').replace(/\//g, '-');
     const filename = `${fondoNombre} - ${hoy}.xls`;
-
     let html = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
         <head><meta charset="UTF-8"></head>
         <body>
         <table border="1">
             <tr style="background-color: #0984e3; color: white; font-weight: bold; text-align: center;">
-                <th>Fecha</th>
-                <th>VCP</th>
-                <th>Dinero Total (ARS)</th>
-                <th>Dinero Total (USD)</th>
-                <th>Ganancia Diaria (ARS)</th>
-                <th>Ganancia Diaria (USD)</th>
-                <th>Variacion %</th>
-                <th>Nota</th>
+                <th>Fecha</th><th>VCP</th><th>Dinero Total (ARS)</th><th>Dinero Total (USD)</th>
+                <th>Ganancia Diaria (ARS)</th><th>Ganancia Diaria (USD)</th><th>Variacion %</th><th>Nota</th>
             </tr>`;
-
     [...historialBase].reverse().forEach((h, idx) => {
         const idxOriginal = historialBase.findIndex(item => item.fecha === h.fecha);
         let gananciaARS = h.ganancia || 0;
         const esMovManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate"));
-
         if (!esMovManual && gananciaARS === 0 && idxOriginal > 0) {
             gananciaARS = h.dinero - historialBase[idxOriginal - 1].dinero;
         }
-
         const colorTexto = gananciaARS >= 0 ? "#27ae60" : "#d63031";
         const bgColor = esMovManual ? "#f1f2f6" : "#ffffff";
-
         html += `
             <tr style="background-color: ${bgColor};">
                 <td style="text-align: center;">${h.fecha.split('-').reverse().join('/')}</td>
@@ -226,9 +214,7 @@ function exportarAExcel(fondoNombre) {
                 <td>${h.nota || ""}</td>
             </tr>`;
     });
-
     html += `</table></body></html>`;
-
     const blob = new Blob([html], { type: "application/vnd.ms-excel" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -238,7 +224,6 @@ function exportarAExcel(fondoNombre) {
 
 // 5. INICIALIZACIÓN
 async function inicializarDashboard() {
-    // ESTA ES LA LÍNEA QUE TENÉS QUE AGREGAR:
     chrome.action.setBadgeText({ text: "" });
     await obtenerDolar();
     chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas'], async (res) => {
@@ -267,46 +252,35 @@ async function inicializarDashboard() {
 
             const registrosValidos = historialBase.filter(h => h.variacion !== undefined && !h.nota?.includes("Suscripción") && !h.nota?.includes("Rescate"));
 
-            let variacionAcumulada7d = 0;
-            let gananciaAcumulada7d = 0;
-            let gananciaAcumulada7dUSD = 0;
+            // --- LÓGICA DE GANANCIA ACUMULADA TOTAL (CORREGIDA) ---
+            const gananciaAcumuladaTOTAL = ultimoRegistro.dinero - INVERSION_INICIAL_FIJA;
+            const gananciaAcumuladaTOTALUSD = gananciaAcumuladaTOTAL / cotizacionDolar;
 
+            let variacionAcumulada7d = 0;
             if (registrosValidos.length > 0) {
                 const ultimos7 = registrosValidos.slice(-7);
-                const dineroFinal7d = ultimos7[ultimos7.length - 1].dinero;
                 const vcpFinal = ultimos7[ultimos7.length - 1].vcp;
-
                 const indexPrimero = historialBase.indexOf(ultimos7[0]);
                 const registroBase = indexPrimero > 0 ? historialBase[indexPrimero - 1] : ultimos7[0];
-
                 const vcpInicial = registroBase.vcp;
-                const dineroInicial7d = registroBase.dinero;
-
                 variacionAcumulada7d = ((vcpFinal - vcpInicial) / vcpInicial) * 100;
-                gananciaAcumulada7d = dineroFinal7d - dineroInicial7d;
-                gananciaAcumulada7dUSD = gananciaAcumulada7d / cotizacionDolar;
             }
 
             const ultimos7Tasa = registrosValidos.slice(-7);
             const promedioDiario = ultimos7Tasa.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos7Tasa.length || 1);
             const diariaDecimal = promedioDiario / 100;
-
             const tna = diariaDecimal * 365 * 100;
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
-
             const mensualTNAPorc = (tna / 365 * 30);
             const mensualTEAPorc = (Math.pow(1 + (tea / 100), 30 / 365) - 1) * 100;
 
             const saldoARSActual = ultimoRegistro.dinero;
             const saldoUSDActual = saldoARSActual / cotizacionDolar;
-
             const proyARS_Nominal = saldoARSActual * (1 + (mensualTNAPorc / 100));
             const proyARS_Efectiva = saldoARSActual * (1 + (mensualTEAPorc / 100));
-
             const gananciaProyNominal = proyARS_Nominal - saldoARSActual;
             const gananciaProyEfectiva = proyARS_Efectiva - saldoARSActual;
 
-            // --- CÁLCULO DÍAS DE INVERSIÓN ---
             const fechaInicio = new Date(historialBase[0].fecha);
             const fechaFin = new Date(ultimoRegistro.fecha);
             const diferenciaTiempo = Math.abs(fechaFin - fechaInicio);
@@ -326,17 +300,17 @@ async function inicializarDashboard() {
                     </div>
                     <div style="margin-top: 8px; padding: 5px 12px; background: #f8f9fa; border-radius: 6px; display: block; border: 1px solid #e9ecef;">
                         <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                            Últimos 7 días: 
+                            Tendencia (7d): 
                             <strong style="color: ${variacionAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
                                 ${variacionAcumulada7d >= 0 ? '▲' : '▼'} ${variacionAcumulada7d.toFixed(2)}%
                             </strong>
                             <span style="margin: 0 8px; color: #ccc;">|</span>
-                            Ganancia acumulada: 
-                            <strong style="color: ${gananciaAcumulada7d >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
-                                +$${gananciaAcumulada7d.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            Ganancia acumulada TOTAL: 
+                            <strong style="color: ${gananciaAcumuladaTOTAL >= 0 ? '#27ae60' : '#e74c3c'}; margin-left: 5px;">
+                                +$${gananciaAcumuladaTOTAL.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </strong>
                             <span style="color: #636e72; font-size: 11px; margin-left: 4px;">
-                                (u$s ${gananciaAcumulada7dUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                (u$s ${gananciaAcumuladaTOTALUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                             </span>
                         </div>
                         <div style="font-size: 11px; color: #7f8c8d; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #eee;">
@@ -351,11 +325,6 @@ async function inicializarDashboard() {
                             <strong>Proyección Saldo (30d):</strong> 
                             Nominal: <span style="color: #2980b9; font-weight: bold;">$${proyARS_Nominal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
                             Efectiva: <span style="color: #27ae60; font-weight: bold;">$${proyARS_Efectiva.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div style="font-size: 11px; margin-top: 2px; color: #7f8c8d; opacity: 0.9;">
-                            <strong>Ganancia proyectada (30d):</strong> 
-                            Nominal: <span style="color: #2980b9;">+$${gananciaProyNominal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
-                            Efectiva: <span style="color: #27ae60;">+$${gananciaProyEfectiva.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </div>
                 </div>

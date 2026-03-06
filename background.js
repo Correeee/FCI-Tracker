@@ -22,7 +22,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "checkFCI") checkUpdates();
 });
 
-// 3. Escuchador de mensajes
+// 3. Escuchadores de mensajes y eventos
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "testNotif") {
     checkUpdates(true).then(() => {
@@ -34,9 +34,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// EVENTO: Al hacer clic en la notificación, solo limpia el Badge ("!")
+chrome.notifications.onClicked.addListener((notificationId) => {
+  chrome.action.setBadgeText({ text: "" });
+  chrome.notifications.clear(notificationId);
+});
+
 // 4. Lógica principal consultando MEMORIA (storage)
 async function checkUpdates(esTest = false) {
-  // Traemos el historial guardado por la extensión
   const res = await chrome.storage.sync.get(['fondoNombre', 'ultimaFechaNotificada', 'cuotas', 'historial']);
   
   if (!res.fondoNombre || !res.cuotas || !res.historial || res.historial.length === 0) {
@@ -47,7 +52,7 @@ async function checkUpdates(esTest = false) {
   try {
     let cotizacionOficial = 1425; 
 
-    // Intentar actualizar Dólar para la conversión
+    // Intentar actualizar Dólar
     try {
         const dolarRes = await fetch(`https://dolarapi.com/v1/dolares/oficial`);
         if (dolarRes.ok) {
@@ -56,21 +61,18 @@ async function checkUpdates(esTest = false) {
         }
     } catch (e) { console.warn("Usando dólar fallback"); }
 
-    // El historial ya viene ordenado por el popup, pero nos aseguramos el más reciente primero
-    const historial = res.historial.reverse();
+    // Ordenamos historial: el más reciente primero
+    const historial = [...res.historial].reverse();
 
     // BUSQUEDA EN MEMORIA: Buscamos el último registro con variación != 0
     const registroConRendimiento = historial.find(f => f.variacion !== 0) || historial[0];
     
-    // El saldo lo calculamos siempre con el VCP más nuevo que tengamos en memoria
     const ultimoVCP = historial[0].vcp;
     const fechaUltima = registroConRendimiento.fecha;
     const variacion = registroConRendimiento.variacion;
     
     const misCuotas = parseFloat(res.cuotas);
     const saldoActual = misCuotas * ultimoVCP;
-    
-    // Calculamos ganancia basada en ese rendimiento encontrado
     const gananciaPesos = (saldoActual * variacion) / 100;
     
     const esPositivo = variacion >= 0;
@@ -78,7 +80,7 @@ async function checkUpdates(esTest = false) {
     const icon = await generarIconoColor(color);
     const saldoUSD = saldoActual / cotizacionOficial;
 
-    // Solo notificar si es Test o si el cierre es nuevo
+    // COMPARACIÓN: ¿Es una prueba o es un rendimiento de fecha nueva?
     if (esTest || (fechaUltima !== res.ultimaFechaNotificada)) {
       
       chrome.notifications.create("fci_memoria_" + fechaUltima, {
@@ -92,7 +94,11 @@ async function checkUpdates(esTest = false) {
       chrome.action.setBadgeText({ text: "!" });
       chrome.action.setBadgeBackgroundColor({ color: color });
       
-      if (!esTest) chrome.storage.sync.set({ ultimaFechaNotificada: fechaUltima });
+      if (!esTest) {
+          chrome.storage.sync.set({ ultimaFechaNotificada: fechaUltima });
+      }
+    } else {
+        console.log(`😴 Notificación omitida: El cierre del ${fechaUltima} ya fue notificado.`);
     }
   } catch (e) { 
       console.error("❌ Error en checkUpdates:", e.message); 
