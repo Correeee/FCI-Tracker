@@ -47,7 +47,16 @@ async function renderizarDesdeStorage() {
         const ultimo = historial[historial.length - 1];
         const vcpActual = ultimo.vcp;
         const saldoActual = CUOTAPARTES_TOTALES * vcpActual;
-        const gananciaTotalPesos = saldoActual - INVERSION_INICIAL_PESOS;
+
+        // --- CÁLCULO DE CAPITAL VIVO PARA GANANCIA TOTAL ---
+        let capitalVivo = INVERSION_INICIAL_PESOS;
+        historial.forEach(h => {
+            if (h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate") || h.nota.includes("(+)") || h.nota.includes("(-)"))) {
+                capitalVivo += (h.ganancia || 0);
+            }
+        });
+        
+        const gananciaTotalPesos = saldoActual - capitalVivo;
 
         // Sincronizar inputs con 2 decimales
         document.getElementById('miInversion').value = saldoActual.toFixed(2);
@@ -76,7 +85,7 @@ async function renderizarDesdeStorage() {
                 <div style="display: flex; justify-content: space-between;">Cuotas totales: <strong style="font-family:'Inter'">${CUOTAPARTES_TOTALES.toFixed(2)}</strong></div>
                 <div style="display: flex; justify-content: space-between; margin-top: 4px;">Ganancia Total: 
                     <span style="color:${posTotal ? 'var(--positive)' : 'var(--negative)'}; font-weight:800; font-family:'Inter'">
-                        +$${f(gananciaTotalPesos, saldoOculto)} 
+                        ${posTotal ? '+' : '-'} $${f(Math.abs(gananciaTotalPesos), saldoOculto)} 
                     </span>
                 </div>
                 <div style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 10px; color: var(--text-main); font-weight: 600; text-align: center;">

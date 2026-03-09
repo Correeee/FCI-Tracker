@@ -8,18 +8,16 @@ let paginaActual = 1;
 const registrosPorPagina = 5;
 let historialFiltradoActual = [];
 
-// 2. DÓLAR (Modificado para obtener Compra y Venta)
+// 2. DÓLAR
 async function obtenerDolar() {
     try {
         const response = await fetch('https://dolarapi.com/v1/dolares/oficial');
         const data = await response.json();
         
-        // Guardamos la venta para los cálculos internos
         cotizacionDolar = data.venta; 
         
         const dolarDisplay = document.getElementById('cotizacionHoy');
         if (dolarDisplay) {
-            // Mostramos ambos valores en el encabezado
             dolarDisplay.textContent = `Dólar Oficial: Compra $${data.compra.toFixed(2)} | Venta $${data.venta.toFixed(2)}`;
         }
         return data.venta;
@@ -30,7 +28,7 @@ async function obtenerDolar() {
     }
 }
 
-// 3. GRÁFICO (Configuración de ejes ARS y USD)
+// 3. GRÁFICO
 function crearGrafico(historial, precioDolar) {
     const canvas = document.getElementById('graficoEvolucion');
     if (!canvas) return;
@@ -111,22 +109,30 @@ function renderizarDashboard(historialFiltrado, reiniciarPagina = false) {
     const tbody = document.getElementById('cuerpoTablaFull');
     if (tbody) {
         tbody.innerHTML = segmentado.map((h) => {
-            let ganancia = h.ganancia || 0;
-            if (ganancia === 0) {
-                const idx = historialBase.findIndex(item => item.fecha === h.fecha);
-                if (idx > 0) ganancia = h.dinero - historialBase[idx - 1].dinero;
+            let ganancia = h.ganancia;
+            if (ganancia === undefined) {
+                if (h._idx > 0) {
+                    ganancia = h.dinero - historialBase[h._idx - 1].dinero;
+                } else {
+                    ganancia = h.dinero - INVERSION_INICIAL_FIJA;
+                }
             }
-            const acum = h.dinero - INVERSION_INICIAL_FIJA;
+            
+            // Acumulado exacto (Dinero vs Capital Invertido en ese día)
+            const acum = h.dinero - h._capitalEnEseMomento;
             const gananciaUSD = ganancia / cotizacionDolar;
+
+            const formatARS = (val) => `${val >= 0 ? '$' : '-$'}${Math.abs(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const formatUSD = (val) => `${val >= 0 ? 'u$s ' : '-u$s '}${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
             return `
                 <tr>
                     <td style="font-weight: 600;">${h.fecha.split('-').reverse().join('/')}</td>
-                    <td><span style="font-family:'Inter'; font-size:18px;">$${h.dinero.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">VCP: $${h.vcp.toFixed(2)}</small></td>
-                    <td><span style="font-family:'Inter'; font-size:18px; color:#27ae60;">u$s ${(h.dinero/cotizacionDolar).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">Acum: $${acum.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</small></td>
+                    <td><span style="font-family:'Inter'; font-size:18px;">$${h.dinero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">VCP: $${h.vcp.toFixed(2)}</small></td>
+                    <td><span style="font-family:'Inter'; font-size:18px; color:#27ae60;">u$s ${(h.dinero/cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><br><small style="color:#999; font-family:'Inter'; font-weight:500;">Acum: ${formatARS(acum)}</small></td>
                     <td style="font-weight: 600; color: ${ganancia >= 0 ? '#27ae60' : '#d63031'}">
-                        $${ganancia.toLocaleString('es-AR', { maximumFractionDigits: 2 })}<br>
-                        <small style="opacity:0.8">u$s ${gananciaUSD.toLocaleString('en-US', { maximumFractionDigits: 2 })}</small>
+                        ${formatARS(ganancia)}<br>
+                        <small style="opacity:0.8">${formatUSD(gananciaUSD)}</small>
                     </td>
                     <td style="font-weight: 700; color: ${h.variacion >= 0 ? '#27ae60' : '#d63031'}">${h.variacion >= 0 ? '▲' : '▼'} ${Math.abs(h.variacion).toFixed(2)}%</td>
                 </tr>`;
@@ -174,10 +180,13 @@ function exportarAExcel(fondoNombre) {
                 <th>Ganancia Diaria (ARS)</th><th>Ganancia Diaria (USD)</th><th>Variacion %</th>
             </tr>`;
     [...historialBase].reverse().forEach((h) => {
-        let gananciaARS = h.ganancia || 0;
-        if (gananciaARS === 0) {
-            const idx = historialBase.findIndex(item => item.fecha === h.fecha);
-            if (idx > 0) gananciaARS = h.dinero - historialBase[idx - 1].dinero;
+        let gananciaARS = h.ganancia;
+        if (gananciaARS === undefined) {
+            if (h._idx > 0) {
+                gananciaARS = h.dinero - historialBase[h._idx - 1].dinero;
+            } else {
+                gananciaARS = h.dinero - INVERSION_INICIAL_FIJA;
+            }
         }
         const gananciaUSD = gananciaARS / cotizacionDolar;
 
@@ -206,8 +215,44 @@ async function inicializarDashboard() {
     await obtenerDolar();
     chrome.storage.sync.get(['historial', 'usuario', 'fondoNombre', 'cuotas', 'visibilidadDashboard'], async (res) => {
         const cuotas = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
-        historialBase = (res.historial || []).map(h => ({ ...h, dinero: h.dinero || (h.vcp * cuotas) }));
         
+        // --- SANITIZACIÓN: ELIMINAR ENTRADAS "ATRASADAS" DE LA API ---
+        let rawHistorial = res.historial || [];
+        let cleanedHistorial = [];
+        let maxDate = "1970-01-01";
+        
+        for (let h of rawHistorial) {
+            let isManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate") || h.nota.includes("(+)") || h.nota.includes("(-)"));
+            
+            if (isManual) {
+                cleanedHistorial.push(h);
+                if (h.fecha > maxDate) maxDate = h.fecha;
+            } else {
+                if (h.fecha >= maxDate) {
+                    const existingIdx = cleanedHistorial.findIndex(item => item.fecha === h.fecha && (!item.nota || item.nota === "Actualización automática"));
+                    if (existingIdx !== -1) {
+                        cleanedHistorial[existingIdx] = h; // Reemplaza si hay un duplicado en el mismo día
+                    } else {
+                        cleanedHistorial.push(h);
+                    }
+                    if (h.fecha > maxDate) maxDate = h.fecha;
+                }
+            }
+        }
+        
+        cleanedHistorial.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        historialBase = cleanedHistorial.map(h => ({ ...h, dinero: h.dinero || (h.vcp * cuotas) }));
+        
+        // --- CÁLCULO DE CAPITAL VIVO ---
+        let capitalActivo = INVERSION_INICIAL_FIJA;
+        historialBase.forEach((h, i) => {
+            h._idx = i;
+            if (h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate") || h.nota.includes("(+)") || h.nota.includes("(-)"))) {
+                capitalActivo += (h.ganancia || 0);
+            }
+            h._capitalEnEseMomento = capitalActivo;
+        });
+
         document.getElementById('displayUsuario').textContent = res.usuario || "Maxi";
         const fondoNombre = res.fondoNombre || "SBS";
         document.getElementById('badgeFondo').textContent = fondoNombre;
@@ -215,7 +260,9 @@ async function inicializarDashboard() {
         if (historialBase.length > 0) {
             const ultimo = historialBase[historialBase.length - 1];
             const validos = historialBase.filter(h => h.variacion !== undefined);
-            const ganTotal = ultimo.dinero - INVERSION_INICIAL_FIJA;
+            
+            // Ganancia Total = Dinero Final - El capital real que tengas invertido hoy
+            const ganTotal = ultimo.dinero - ultimo._capitalEnEseMomento;
             
             let variacion7dReal = 0;
             if (historialBase.length >= 2) {
@@ -252,17 +299,17 @@ async function inicializarDashboard() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                             <div>
                                 <span style="display: block; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family:'Inter'">Balance Total</span>
-                                <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                                <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: #27ae60; margin-bottom: 2px;">+ $${ganTotal.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
-                                <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: ${ganTotal >= 0 ? '#27ae60' : '#e74c3c'}; margin-bottom: 2px;">${ganTotal >= 0 ? '+' : '-'} $${Math.abs(ganTotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
                         <div style="font-size: 12px; opacity: 0.7; border-top: 1px solid #333; padding-top: 20px; display: flex; gap: 30px; font-family:'Inter'; font-weight:500;">
-                            <span style="display: flex; align-items: center; gap: 6px;">Tendencia (7d): <strong style="color:#27ae60; font-weight:700;">▲ ${variacion7dReal.toFixed(2)}%</strong></span>
+                            <span style="display: flex; align-items: center; gap: 6px;">Tendencia (7d): <strong style="color:${variacion7dReal >= 0 ? '#27ae60' : '#e74c3c'}; font-weight:700;">${variacion7dReal >= 0 ? '▲' : '▼'} ${Math.abs(variacion7dReal).toFixed(2)}%</strong></span>
                             <span>Invertido: <strong style="color:#fff">${dias} días</strong></span>
-                            <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</strong></span>
+                            <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
                         </div>
                     </div>
                 </div>`;
