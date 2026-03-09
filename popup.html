@@ -175,7 +175,6 @@
         
         #btnVerMas { background: none; color: #000; border: none; cursor: pointer; font-size: 12px; font-weight: 700; text-decoration: underline; width: 100%; }
         
-
         @keyframes sweep { 0% {opacity: 0; transform: translateY(-5px)} 100% {opacity: 1; transform: translateY(0)} }
         details[open] summary ~ * { animation: sweep 0.3s ease-in-out; }
     </style>
@@ -197,30 +196,30 @@
             <input type="text" id="buscador" placeholder="Ej: SBS, Balanz...">
             <div id="listaFondos"></div>
             <div id="fondoElegidoDisplay" class="selected-fondo" style="display:none"></div>
+
+            <label>Inversión (ARS)</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="miInversion" placeholder="Monto">
+                <button id="btnAgregarDinero" title="Suscripción/Rescate">+</button>
+            </div>
+
+            <div id="sectionAporte">
+                <label style="margin-top: 0;">Dinero a mover</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="number" id="inputNuevoAporte" placeholder="$ 0.00">
+                    <button id="btnConfirmarAporte" style="flex: 0 0 60px;">OK</button>
+                </div>
+                <div class="radio-group">
+                    <label><input type="radio" name="tipoMov" value="sumar" checked> Suscripción</label>
+                    <label><input type="radio" name="tipoMov" value="restar"> Rescate</label>
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-bottom: 10px;">
+                <button id="btnGuardar">Guardar</button>
+                <button id="btnReset">Reset</button>
+            </div>
         </details>
-
-        <label>Inversión (ARS)</label>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="number" id="miInversion" placeholder="Monto">
-            <button id="btnAgregarDinero" title="Suscripción/Rescate">+</button>
-        </div>
-
-        <div id="sectionAporte">
-            <label style="margin-top: 0;">Dinero a mover</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="number" id="inputNuevoAporte" placeholder="$ 0.00">
-                <button id="btnConfirmarAporte" style="flex: 0 0 60px;">OK</button>
-            </div>
-            <div class="radio-group">
-                <label><input type="radio" name="tipoMov" value="sumar" checked> Suscripción</label>
-                <label><input type="radio" name="tipoMov" value="restar"> Rescate</label>
-            </div>
-        </div>
-
-        <div class="btn-group">
-            <button id="btnGuardar">Guardar</button>
-            <button id="btnReset">Reset</button>
-        </div>
 
         <div id="content" class="result">
             <div style="font-size:12px; color:#999">Cargando...</div>
