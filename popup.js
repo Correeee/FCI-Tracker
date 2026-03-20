@@ -63,10 +63,10 @@ async function renderizarDesdeStorage() {
         document.getElementById('valVCP').textContent = vcpActual.toFixed(2);
         document.getElementById('fechaVCP').textContent = ultimo.fecha.split('-').reverse().join('/');
 
-        // CÁLCULO TASAS PROMEDIO (7 DÍAS)
-        const registrosValidos = historial.filter(h => h.variacion !== undefined && !h.nota?.includes("(+)") && !h.nota?.includes("(-)"));
-        const ultimos7 = registrosValidos.slice(-7);
-        const promedioDiario = ultimos7.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos7.length || 1);
+        // CÁLCULO TASAS PROMEDIO (30 DÍAS)
+        const registrosValidos = historial.filter(h => h.variacion !== undefined && !h.nota?.includes("(+)" ) && !h.nota?.includes("(-)"));
+        const ultimos30 = registrosValidos.slice(-30);
+        const promedioDiario = ultimos30.reduce((acc, curr) => acc + curr.variacion, 0) / (ultimos30.length || 1);
 
         const diariaDecimal = promedioDiario / 100;
         const tna = diariaDecimal * 365 * 100;
@@ -85,11 +85,12 @@ async function renderizarDesdeStorage() {
                 <div style="display: flex; justify-content: space-between;">Cuotas totales: <strong style="font-family:'Inter'">${CUOTAPARTES_TOTALES.toFixed(2)}</strong></div>
                 <div style="display: flex; justify-content: space-between; margin-top: 4px;">Ganancia Total: 
                     <span style="color:${posTotal ? 'var(--positive)' : 'var(--negative)'}; font-weight:800; font-family:'Inter'">
-                        ${posTotal ? '+' : '-'} $${f(Math.abs(gananciaTotalPesos), saldoOculto)} 
+                        ${posTotal ? '+' : '-'} $${f(Math.abs(gananciaTotalPesos), saldoOculto)}
+                        <span style="color:#27ae60; font-weight:800; font-family:'Inter'; font-size:13px; margin-left:6px;">(${posTotal ? '+' : '-'} u$s ${(Math.abs(gananciaTotalPesos)/precioDolar).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2})})</span>
                     </span>
                 </div>
                 <div style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 10px; color: var(--text-main); font-weight: 600; text-align: center;">
-                    Promedio (7d): <span style="color:var(--positive)">TNA ${tna.toFixed(1)}%</span> | <span style="color:#0984e3">TEA ${tea.toFixed(1)}%</span>
+                    Promedio (30d): <span style="color:var(--positive)">TNA ${tna.toFixed(1)}%</span> | <span style="color:#0984e3">TEA ${tea.toFixed(1)}%</span>
                 </div>
             </div>
             <div style="color:${varDiaria >= 0 ? 'var(--positive)' : 'var(--negative)'}; font-weight:800; background: ${varDiaria >= 0 ? '#eafff2' : '#fff0f0'}; padding: 6px 16px; border-radius: 10px; display: inline-block; font-size: 13px; font-family:'Inter'">
@@ -105,8 +106,8 @@ async function renderizarDesdeStorage() {
         const usdContent = document.getElementById('usdContent');
         if (usdContent) {
             usdContent.style.display = 'block';
-            document.getElementById('valUSD').textContent = `u$s ${f((saldoActual / precioDolar), saldoOculto)}`;
-            document.getElementById('cotizacionMEP').textContent = `Dólar Oficial: $${precioDolar.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`;
+            document.getElementById('valUSD').textContent = `${f((saldoActual / precioDolar), saldoOculto)}`;
+            document.getElementById('cotizacionMEP').textContent = '';
         }
     } else {
         console.warn("ℹ️ [2] El historial está vacío.");
@@ -209,6 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnReset').onclick = () => { if (confirm("⚠️ ¿Resetear?")) chrome.storage.sync.clear(() => location.reload()); };
     document.getElementById('btnRecargar').onclick = () => location.reload();
     document.getElementById('btnVerMas').onclick = () => chrome.tabs.create({ url: 'dashboard.html' });
+
+    // ...existing code...
 });
 
 async function cargarFondos(tipo, preseleccionado = null) {

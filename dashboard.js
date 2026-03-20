@@ -177,7 +177,7 @@ function exportarAExcel(fondoNombre) {
         <table border="1">
             <tr style="background-color: #000; color: white; font-weight: bold; text-align: center;">
                 <th>Fecha</th><th>VCP</th><th>Dinero Total (ARS)</th><th>Dinero Total (USD)</th>
-                <th>Ganancia Diaria (ARS)</th><th>Ganancia Diaria (USD)</th><th>Variacion %</th>
+                                <span style="display: block; font-size: 10px; font-weight: 800; color: #999; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; font-family:'Inter'">Rendimiento (30d)</span>
             </tr>`;
     [...historialBase].reverse().forEach((h) => {
         let gananciaARS = h.ganancia;
@@ -217,31 +217,9 @@ async function inicializarDashboard() {
         const cuotas = res.cuotas ? parseFloat(res.cuotas) : MIS_CUOTAPARTES_BACKUP;
         
         // --- SANITIZACIÓN: ELIMINAR ENTRADAS "ATRASADAS" DE LA API ---
-        let rawHistorial = res.historial || [];
-        let cleanedHistorial = [];
-        let maxDate = "1970-01-01";
-        
-        for (let h of rawHistorial) {
-            let isManual = h.nota && (h.nota.includes("Suscripción") || h.nota.includes("Rescate") || h.nota.includes("(+)") || h.nota.includes("(-)"));
-            
-            if (isManual) {
-                cleanedHistorial.push(h);
-                if (h.fecha > maxDate) maxDate = h.fecha;
-            } else {
-                if (h.fecha >= maxDate) {
-                    const existingIdx = cleanedHistorial.findIndex(item => item.fecha === h.fecha && (!item.nota || item.nota === "Actualización automática"));
-                    if (existingIdx !== -1) {
-                        cleanedHistorial[existingIdx] = h; // Reemplaza si hay un duplicado en el mismo día
-                    } else {
-                        cleanedHistorial.push(h);
-                    }
-                    if (h.fecha > maxDate) maxDate = h.fecha;
-                }
-            }
-        }
-        
-        cleanedHistorial.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-        historialBase = cleanedHistorial.map(h => ({ ...h, dinero: h.dinero || (h.vcp * cuotas) }));
+        // Usar el historial directamente como en popup.js
+        let historial = res.historial || [];
+        historialBase = historial.map(h => ({ ...h, dinero: h.dinero || (h.vcp * cuotas) }));
         
         // --- CÁLCULO DE CAPITAL VIVO ---
         let capitalActivo = INVERSION_INICIAL_FIJA;
@@ -272,11 +250,15 @@ async function inicializarDashboard() {
                 variacion7dReal = ((ultimo.vcp - vcpHace7) / vcpHace7) * 100;
             }
 
-            const ultimos7 = validos.slice(-7);
-            const promedioDiario = ultimos7.length > 0 ? (ultimos7.reduce((acc, curr) => acc + curr.variacion, 0) / ultimos7.length) : 0;
-            const tna = promedioDiario * 365;
-            const mensualNominal = promedioDiario * 30;
-            const mensualEf = (Math.pow(1 + (promedioDiario/100), 30) - 1) * 100;
+            const registrosValidos = validos.filter(h => !h.nota?.includes("(+)" ) && !h.nota?.includes("(-)"));
+            const ultimos30 = registrosValidos.slice(-30);
+            const promedioDiario = ultimos30.length > 0 ? (ultimos30.reduce((acc, curr) => acc + curr.variacion, 0) / ultimos30.length) : 0;
+            const diariaDecimal = promedioDiario / 100;
+            const tna = diariaDecimal * 365 * 100;
+            const mensualNominal = diariaDecimal * 30 * 100;
+            const mensualEf = (Math.pow(1 + diariaDecimal, 30) - 1) * 100;
+            // TEA igual que en popup
+            const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
             const dias = Math.ceil(Math.abs(new Date(ultimo.fecha) - new Date(historialBase[0].fecha)) / 86400000);
 
             document.getElementById('vcpInfo').innerHTML = `
@@ -285,8 +267,8 @@ async function inicializarDashboard() {
                     
                     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                         <div id="rendimiento-proyectado" style="background: #f7f7f7; padding: 16px 24px; border-radius: 20px; border: 1px solid #eee; flex: 1; min-width: 220px;">
-                            <span style="display: block; font-size: 10px; font-weight: 800; color: #999; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; font-family:'Inter'">Rendimiento (7d)</span>
-                            <span style="color: #27ae60; font-weight: 300; font-family:'Inter'; font-size: 18px;">TNA: ${tna.toFixed(2)}% | TEA: ${(tna*1.1).toFixed(2)}%</span>
+                            <span style="display: block; font-size: 10px; font-weight: 800; color: #999; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; font-family:'Inter'">Rendimiento (30d)</span>
+                            <span style="color: #27ae60; font-weight: 300; font-family:'Inter'; font-size: 18px;">TNA: ${tna.toFixed(1)}% | TEA: ${tea.toFixed(1)}%</span>
                         </div>
                         
                         <div id="proyeccion-mensual" style="background: #f7f7f7; padding: 16px 24px; border-radius: 20px; border: 1px solid #eee; flex: 1; min-width: 220px;">
@@ -302,7 +284,10 @@ async function inicializarDashboard() {
                                 <span style="font-size: 44px; font-weight: 300; letter-spacing: -2px; font-family: 'Inter';">$${ultimo.dinero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: ${ganTotal >= 0 ? '#27ae60' : '#e74c3c'}; margin-bottom: 2px;">${ganTotal >= 0 ? '+' : '-'} $${Math.abs(ganTotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span style="display: block; font-family:'Inter'; font-size: 22px; color: ${ganTotal >= 0 ? '#27ae60' : '#e74c3c'}; margin-bottom: 2px;">
+                                    ${ganTotal >= 0 ? '+' : '-'} $${Math.abs(ganTotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    <span style="color:#27ae60; font-size:16px; font-weight:800; margin-left:8px;">(${ganTotal >= 0 ? '+' : '-'} u$s ${(Math.abs(ganTotal)/cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                                </span>
                                 <span style="font-size: 18px; font-family:'Inter'; opacity: 0.8;">u$s ${(ultimo.dinero/cotizacionDolar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>

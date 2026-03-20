@@ -74,6 +74,7 @@ async function checkUpdates(esTest = false) {
     const misCuotas = parseFloat(res.cuotas);
     const saldoActual = misCuotas * ultimoVCP;
     const gananciaPesos = (saldoActual * variacion) / 100;
+    const gananciaUSD = gananciaPesos / cotizacionOficial;
     
     const esPositivo = variacion >= 0;
     const color = esPositivo ? "#27ae60" : "#e74c3c";
@@ -87,7 +88,7 @@ async function checkUpdates(esTest = false) {
         type: 'basic',
         iconUrl: icon,
         title: `Saldo: $${saldoActual.toLocaleString('es-AR', {minimumFractionDigits: 2})}`,
-        message: `Cierre: ${fechaUltima.split('-').reverse().join('/')}\nRendimiento: ${esPositivo ? '▲' : '▼'} ${variacion.toFixed(2)}% (+$${gananciaPesos.toLocaleString('es-AR', {minimumFractionDigits: 2})})\nUSD: u$s ${saldoUSD.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+      message: `Cierre: ${fechaUltima.split('-').reverse().join('/')}\nRendimiento: ${esPositivo ? '▲' : '▼'} ${variacion.toFixed(2)}% (+$${gananciaPesos.toLocaleString('es-AR', {minimumFractionDigits: 2})})\nGanancia USD: +u$s ${gananciaUSD.toLocaleString('en-US', {minimumFractionDigits: 2})}\nSaldo USD: u$s ${saldoUSD.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
         priority: 2
       });
 
