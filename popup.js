@@ -106,7 +106,7 @@ async function renderizarDesdeStorage() {
         const usdContent = document.getElementById('usdContent');
         if (usdContent) {
             usdContent.style.display = 'block';
-            document.getElementById('valUSD').textContent = `${f((saldoActual / precioDolar), saldoOculto)}`;
+            document.getElementById('valUSD').innerHTML = `<span style="display:block; color:#27ae60; font-size:28px; font-weight:700;">${f((saldoActual / precioDolar), saldoOculto)}</span><span style="display:block; color:#27ae60; font-size:13px; font-weight:600; margin-top:2px;">USD</span>`;
             document.getElementById('cotizacionMEP').textContent = '';
         }
     } else {
