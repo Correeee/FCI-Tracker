@@ -261,6 +261,26 @@ async function inicializarDashboard() {
             const tea = (Math.pow(1 + diariaDecimal, 365) - 1) * 100;
             const dias = Math.ceil(Math.abs(new Date(ultimo.fecha) - new Date(historialBase[0].fecha)) / 86400000);
 
+                // --- Ganancia diaria promedio últimos 30 días ---
+                let sumaGananciaARS = 0;
+                let sumaGananciaUSD = 0;
+                let diasGanancia = 0;
+                ultimos30.forEach((h, idx) => {
+                    let gananciaARS = h.ganancia;
+                    if (gananciaARS === undefined) {
+                        if (h._idx > 0) {
+                            gananciaARS = h.dinero - historialBase[h._idx - 1].dinero;
+                        } else {
+                            gananciaARS = h.dinero - INVERSION_INICIAL_FIJA;
+                        }
+                    }
+                    sumaGananciaARS += gananciaARS;
+                    sumaGananciaUSD += gananciaARS / cotizacionDolar;
+                    diasGanancia++;
+                });
+                const promedioGananciaARS = diasGanancia > 0 ? sumaGananciaARS / diasGanancia : 0;
+                const promedioGananciaUSD = diasGanancia > 0 ? sumaGananciaUSD / diasGanancia : 0;
+
             document.getElementById('vcpInfo').innerHTML = `
                 <div style="margin-top: 25px; display: flex; flex-direction: column; gap: 20px;">
                     <div style="font-family: 'Inter'; font-size: 28px; font-weight: 300; letter-spacing:-0.5px;">$${ultimo.vcp.toFixed(2)} <span style="font-family: 'Inter'; font-size: 14px; color: #888; font-weight: 500; letter-spacing:0;">ARS/Cuota</span></div>
@@ -295,6 +315,7 @@ async function inicializarDashboard() {
                             <span style="display: flex; align-items: center; gap: 6px;">Tendencia (7d): <strong style="color:${variacion7dReal >= 0 ? '#27ae60' : '#e74c3c'}; font-weight:700;">${variacion7dReal >= 0 ? '▲' : '▼'} ${Math.abs(variacion7dReal).toFixed(2)}%</strong></span>
                             <span>Invertido: <strong style="color:#fff">${dias} días</strong></span>
                             <span>Proyección (30d): <strong style="color:#fff">$${(ultimo.dinero * (1 + mensualEf/100)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                <span>Ganancia diaria promedio (30d): <strong style="color:#27ae60">$${promedioGananciaARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> <span style="color:#888">/ u$s ${promedioGananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                         </div>
                     </div>
                 </div>`;
